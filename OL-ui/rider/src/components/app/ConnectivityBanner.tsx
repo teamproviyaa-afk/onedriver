@@ -32,14 +32,15 @@ export const ConnectivityBadge = ({ state, withCaption = false }: { state: Conne
 };
 
 /**
- * Global banner under the status bar. Shown while the rider is on duty
- * (heartbeat) or whenever the app is offline / syncing / retrying.
+ * Global banner under the status bar for the non-nominal states (offline /
+ * syncing / sync error). The nominal "ONLINE • HEARTBEAT ON" state is shown by
+ * the Home screen's own online banner and on the profile / dev panels via
+ * ConnectivityBadge, so it never overlays screen content.
  */
 export const ConnectivityBanner = () => {
   const state = useConnectivityStore((s) => s.state);
-  const heartbeatOn = useConnectivityStore((s) => s.heartbeatOn);
   const pending = useConnectivityStore((s) => s.pendingCount);
-  if (state === 'online_heartbeat' && !heartbeatOn) return null;
+  if (state === 'online_heartbeat') return null;
   const c = CONNECTIVITY_COPY[state];
   return (
     <View style={styles.bar} pointerEvents="none">
