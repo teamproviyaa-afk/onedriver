@@ -54,6 +54,7 @@ describe('delivery state machine', () => {
   it('maps exactly one exception branch per state', () => {
     expect(canRaiseException('to_pickup', 'vehicle')).toBe(true);
     expect(canRaiseException('at_pickup', 'not_ready')).toBe(true);
+    expect(canRaiseException('at_pickup', 'mismatch')).toBe(true);
     expect(canRaiseException('pickup_verified', 'mismatch')).toBe(true);
     expect(canRaiseException('pickup_verified', 'incomplete')).toBe(true);
     expect(canRaiseException('picked_up', 'safety')).toBe(true);

@@ -75,7 +75,9 @@ const TRANSITIONS: Readonly<Record<JobState, readonly JobState[]>> = {
 /** Exactly one exception branch per state (spec §4.1). */
 export const EXCEPTIONS: Readonly<Partial<Record<JobState, readonly ExceptionKind[]>>> = {
   to_pickup: ['vehicle'],
-  at_pickup: ['not_ready'],
+  // A mismatch / incomplete check is discovered while verifying at the store, so it can be
+  // reported from at_pickup (failed check) as well as from pickup_verified (design table row 06).
+  at_pickup: ['not_ready', 'mismatch', 'incomplete'],
   pickup_verified: ['mismatch', 'incomplete'],
   picked_up: ['safety'],
   to_drop: ['vehicle', 'safety'],
