@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { colors, spacing } from '@/theme';
 import { AppText } from '@/components/ui';
 import type { NotificationKind, RiderNotification } from '@/types';
-import { relativeTime } from '@/utils/format';
 
 /** Left accent bar per notification kind (Figma notifications: lime / amber / blue / red). */
 export const NOTIFICATION_ACCENT: Record<NotificationKind, string> = {
@@ -15,6 +14,18 @@ export const NOTIFICATION_ACCENT: Record<NotificationKind, string> = {
   order_reassigned: colors.danger,
   tier_upgrade: colors.lime,
   system: colors.textSecondary,
+};
+
+/** Figma timestamp copy: "2 min ago" · "1 hr ago" · "3 hrs ago" · "Yesterday" · "2 days ago". */
+export const notificationAge = (iso: string, now: Date = new Date()): string => {
+  const diff = Math.max(0, now.getTime() - new Date(iso).getTime());
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'Just now';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} ${h === 1 ? 'hr' : 'hrs'} ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'Yesterday' : `${d} days ago`;
 };
 
 export interface NotificationCardProps {
@@ -47,7 +58,7 @@ export const NotificationCard = memo(({ notification, onPress, now }: Notificati
             </AppText>
           </View>
           <AppText variant="bodySm" color="textSecondary" style={styles.time}>
-            {relativeTime(notification.createdAt, now)}
+            {notificationAge(notification.createdAt, now)}
           </AppText>
         </View>
         <AppText variant="bodySm" color="textSecondary">

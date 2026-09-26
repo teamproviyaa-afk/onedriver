@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { colors, fontFamily, spacing } from '@/theme';
 import { AppText, Dot } from '@/components/ui';
 import { STATE_LABELS } from '@/state-machine/deliveryStateMachine';
-import { formatClock, formatINR, formatKm } from '@/utils/format';
+import { formatClock, formatINR } from '@/utils/format';
 import type { JobHistoryItem, RiderFlowState } from '@/types';
 
 export interface JobCardProps {
@@ -23,17 +23,17 @@ const statusFor = (item: JobHistoryItem) =>
 
 /**
  * Figma job-history "job-row": white pill card (radius 32.5, 1px #E5E5E0, padding 14) —
- * status dot · pickup → drop area · "Order #… • time • km" · earnings + DELIVERED / FAILED.
+ * status dot · pickup name · "Order #… • 04:12 PM" · earnings + DELIVERED / FAILED.
  */
 export const JobCard = ({ item, onPress }: JobCardProps) => {
   const status = statusFor(item);
   const when = item.deliveredAt ?? item.createdAt;
   const orderRef = item.orderRef.startsWith('#') ? item.orderRef : `#${item.orderRef}`;
-  const title = `${item.pickupName} → ${item.dropArea}`;
+  const amount = formatINR(item.earnings, { decimals: 2 });
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Order ${orderRef}, ${title}, ${status.label}, ${formatINR(item.earnings, { decimals: 2 })}`}
+      accessibilityLabel={`${item.pickupName}, order ${orderRef}, ${formatClock(when)}, ${status.label}, ${amount}`}
       onPress={onPress ? () => onPress(item) : undefined}
       disabled={!onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
@@ -41,20 +41,15 @@ export const JobCard = ({ item, onPress }: JobCardProps) => {
         <Dot color={status.dot} size={10} />
         <View style={styles.texts}>
           <AppText variant="title" numberOfLines={1}>
-            {title}
+            {item.pickupName}
           </AppText>
           <AppText color="textSecondary" style={styles.sub} numberOfLines={1}>
-            Order {orderRef} • {formatClock(when)} • {formatKm(item.distanceKm)}
+            Order {orderRef} • {formatClock(when)}
           </AppText>
-          {item.failureReason ? (
-            <AppText color="danger" style={styles.sub} numberOfLines={1}>
-              {item.failureReason}
-            </AppText>
-          ) : null}
         </View>
       </View>
       <View style={styles.right}>
-        <AppText style={styles.amount}>{formatINR(item.earnings, { decimals: 2 })}</AppText>
+        <AppText style={styles.amount}>{amount}</AppText>
         <AppText color={status.text} style={styles.status}>
           {status.label}
         </AppText>
