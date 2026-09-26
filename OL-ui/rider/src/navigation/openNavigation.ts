@@ -12,13 +12,26 @@ import { log } from '@/utils/logger';
 export const openNavigation = async (dest: LatLng, label?: string): Promise<boolean> => {
   const attempts = navigationAttempts(Platform.OS, dest, label);
   if (Platform.OS === 'web') {
-    // Keep the app tab alive: open Google Maps directions in a new tab.
+    // Web: open Google Maps directions in a NEW tab and never replace the app tab
+    // (a popup blocker may swallow it, which is preferable to losing the app).
+    const url = attempts[attempts.length - 1]!;
     try {
-      const w = typeof window !== 'undefined' ? window.open(attempts[attempts.length - 1]!, '_blank', 'noopener,noreferrer') : null;
-      if (w) return true;
+      if (typeof window !== 'undefined') {
+        const w = window.open(url, '_blank', 'noopener,noreferrer');
+        if (w) return true;
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return true;
+      }
     } catch (e) {
-      log.debug('window.open failed', e);
+      log.debug('web navigation open failed', e);
     }
+    return false;
   }
   for (const url of attempts) {
     try {
