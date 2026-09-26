@@ -1,0 +1,85 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+
+import type { AuthProvider, AuthSession, OtpChallenge } from '@/providers/types';
+import { ApiError } from '@/types';
+import { OTP } from '@/domain/otp';
+import { DEMO_OTP_CODE, DEMO_RETURNING_PHONE } from '@/demo/constants';
+
+const SESSION_KEY = 'onelocal.rider.session.v1';
+
+const secure = {
+  async get(key: string) {
+    if (Platform.OS === 'web') return AsyncStorage.getItem(key);
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch {
+      return AsyncStorage.getItem(key);
+    }
+  },
+  async set(key: string, value: string) {
+    if (Platform.OS === 'web') return AsyncStorage.setItem(key, value);
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch {
+      await AsyncStorage.setItem(key, value);
+    }
+  },
+  async del(key: string) {
+    if (Platform.OS === 'web') return AsyncStorage.removeItem(key);
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      await AsyncStorage.removeItem(key);
+    }
+  },
+};
+
+/**
+ * Deterministic phone + OTP flow for DATA_MODE=local_demo.
+ * OTP is always 123456; the demo rider phone signs in as a returning approved rider,
+ * any other 10-digit number registers as a new rider.
+ */
+export class DemoAuthProvider implements AuthProvider {
+  readonly kind = 'demo' as const;
+  private attempts = new Map<string, number>();
+
+  async restoreSession(): Promise<AuthSession | null> {
+    const raw = await secure.get(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as AuthSession) : null;
+  }
+
+  async sendOtp(phone: string): Promise<OtpChallenge> {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length !== 10) throw new ApiError({ code: 'validation', detail: 'Enter a valid 10-digit mobile number' });
+    this.attempts.set(digits, 0);
+    return { phone: digits, expiresInSeconds: 300, resendAfterSeconds: OTP.resendSeconds, demoCode: DEMO_OTP_CODE };
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<AuthSession> {
+    const digits = phone.replace(/\D/g, '');
+    if (code !== DEMO_OTP_CODE) {
+      const n = (this.attempts.get(digits) ?? 0) + 1;
+      this.attempts.set(digits, n);
+      throw new ApiError({ code: 'otp_invalid', detail: `Incorrect OTP. ${Math.max(0, 5 - n)} attempts left`, meta: { attemptsLeft: Math.max(0, 5 - n) } });
+    }
+    const session: AuthSession = {
+      userId: `demo-user-${digits}`,
+      phone: digits,
+      accessToken: `demo-token-${digits}`,
+      isNewUser: digits !== DEMO_RETURNING_PHONE,
+    };
+    await secure.set(SESSION_KEY, JSON.stringify(session));
+    return session;
+  }
+
+  async signOut(): Promise<void> {
+    await secure.del(SESSION_KEY);
+  }
+
+  async getAccessToken(): Promise<string | null> {
+    const s = await this.restoreSession();
+    return s?.accessToken ?? null;
+  }
+}

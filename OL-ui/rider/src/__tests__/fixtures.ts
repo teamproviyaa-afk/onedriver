@@ -1,0 +1,27 @@
+import type { Job } from '@/types';
+
+export const makeJob = (over: Partial<Job> = {}): Job => ({
+  id: 'job-1',
+  orderRef: '#9001',
+  state: 'accepted',
+  version: 2,
+  category: 'on_order',
+  cityId: 'latur',
+  pickupZone: 'latur-central',
+  dropZone: 'latur-east',
+  pickup: { name: 'Gourmet Kitchen', address: 'Sector 4', lat: 18.4088, lng: 76.5604, accuracyM: 8, source: 'merchant_pin', phoneMasked: true },
+  drop: { area: 'Shanti Enclave', address: 'Apt 4B', lat: 18.4211, lng: 76.5793, accuracyM: 12, source: 'customer_pin', confidence: 0.86, customerFirstName: 'Amit' },
+  items: [{ id: 'i1', name: 'Item', qty: 1 }],
+  itemsCount: 1,
+  cashToCollect: 0,
+  proofMethods: ['otp', 'photo'],
+  payoutEstimate: 85.5,
+  eta: { toPickupMin: 6, toDropMin: 14 },
+  distanceKm: 4.2,
+  deadlines: {},
+  otpAttempts: 0,
+  otpLocked: false,
+  createdAt: '2026-09-26T10:00:00.000Z',
+  updatedAt: '2026-09-26T10:00:00.000Z',
+  ...over,
+});
