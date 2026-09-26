@@ -35,7 +35,7 @@ export const PrimaryButton = ({ label, loading, disabled, icon = 'arrow-right', 
       ) : (
         <View style={styles.row}>
           {icon && iconPosition === 'left' ? <Icon name={icon} size={14} color="limeBright" strokeWidth={2.5} /> : null}
-          <AppText variant="buttonPrimary" color="limeBright">
+          <AppText variant="buttonPrimary" color="limeBright" numberOfLines={1}>
             {label}
           </AppText>
           {icon && iconPosition === 'right' ? (
@@ -65,7 +65,7 @@ export const SecondaryButton = ({ label, loading, disabled, icon = null, iconPos
       ) : (
         <View style={styles.row}>
           {icon && iconPosition === 'left' ? <Icon name={icon} size={16} color="inkSoft" /> : null}
-          <AppText variant="buttonSecondary" color="inkSoft">
+          <AppText variant="buttonSecondary" color="inkSoft" numberOfLines={1}>
             {label}
           </AppText>
           {icon && iconPosition === 'right' ? <Icon name={icon} size={16} color="inkSoft" /> : null}
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkAction,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.gutter,
+    paddingHorizontal: spacing.xxl,
     ...shadows.primaryButton,
   },
   secondary: {
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.gutter,
+    paddingHorizontal: spacing.xxl,
     ...shadows.soft,
   },
   outline: {

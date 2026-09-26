@@ -13,7 +13,7 @@ import { log } from '@/utils/logger';
 import { DemoRouteSimulator } from './demoRouteSimulator';
 import { applyDeviceTrackingMode, stopDeviceTracking, subscribeDevicePosition } from './locationService';
 import { TrackBatcher } from './trackBatcher';
-import { LATUR_CENTER } from '@/demo/seed';
+import { DEMO_STORE_HUB } from '@/demo/seed';
 
 let simulator: DemoRouteSimulator | null = null;
 export const getDemoSimulator = (): DemoRouteSimulator | null => simulator;
@@ -46,8 +46,11 @@ export const useLocationEngine = () => {
     };
     if (simulated) {
       if (!simulator) {
-        const start: LatLng = hub ? { lat: hub.lat, lng: hub.lng } : LATUR_CENTER;
+        const start: LatLng = hub ? { lat: hub.lat, lng: hub.lng } : { lat: DEMO_STORE_HUB.lat, lng: DEMO_STORE_HUB.lng };
         simulator = new DemoRouteSimulator(start);
+      } else if (hub && !onJob) {
+        // Idle rider: keep the demo GPS parked at the rider's own hub.
+        simulator.moveTo({ lat: hub.lat, lng: hub.lng });
       }
       const unsub = simulator.subscribe(onPosition);
       if (online || onJob) simulator.start();

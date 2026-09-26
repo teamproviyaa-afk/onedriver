@@ -41,7 +41,7 @@ export const MapFallback = ({ rider, pickup, drop, style, height = 300, opacity 
   }
   return (
     <View style={[styles.wrap, { height }, style]} accessibilityLabel="Map">
-      <Image source={require('@/assets/figma/map-drawing.png')} style={[StyleSheet.absoluteFill, { opacity, width: '100%', height: '100%' }]} resizeMode="cover" />
+      <Image source={require('@/assets/figma/map-background.png')} style={[StyleSheet.absoluteFill, { opacity, width: '100%', height: '100%' }]} resizeMode="cover" />
       <View style={StyleSheet.absoluteFill} onLayout={undefined}>
         <Layer bounds={bounds} rider={rider} pickup={pickup} drop={drop} height={height} />
       </View>
