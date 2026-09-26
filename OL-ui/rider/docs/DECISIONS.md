@@ -15,3 +15,8 @@
 | 11 | Expo Go limits | Android foreground-service location and remote push need a development build; the app degrades to foreground GPS + local notifications in Expo Go. |
 | 12 | V2 / coming soon | Taxi Partner, rental marketplace, combined delivery, withdraw earnings, chat, masked numbers → "Coming soon" sheets, never operational. |
 | 13 | Supabase | Auth architecture is wired (`SupabaseAuthProvider`, publishable key only). It activates when `DATA_MODE≠local_demo` and `PROVIYAA_API_BASE_URL` is set; MSG91/DLT are server-side. |
+| 14 | Connectivity banner | The four Figma states are implemented in `ConnectivityBanner`/`ConnectivityBadge`. Only the non-nominal states (OFFLINE MODE ACTIVATED, SYNCING QUEUED TASKS, SYNC ERROR • RETRYING) overlay screens; the nominal ONLINE • HEARTBEAT ON state is shown by the Home online banner and the developer panel so it never covers screen content. |
+| 15 | Home radar | The captured radar PNG had no transparency, so the pulse is drawn with Views (100 px translucent lime ring → 64 px #E8F8D5 ring → 24 px lime dot). |
+| 16 | Multiply-blend overlays | The Figma intro-3 and location-permission frames composite a character with `mix-blend-mode: multiply`; the base illustrations already contain the character and React Native Web cannot blend, so the overlays are not rendered. |
+| 17 | Web navigation handoff | On web, "Start navigation" opens Google Maps directions in a new tab; on Android/iOS it hands off to the navigation app on coordinates exactly as specified. |
+| 18 | Offer screen param | `/offer/[id]` takes the job id (what push notifications and dispatch events carry); the screen also accepts an offer id. |

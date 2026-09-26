@@ -11,6 +11,15 @@ import { log } from '@/utils/logger';
  */
 export const openNavigation = async (dest: LatLng, label?: string): Promise<boolean> => {
   const attempts = navigationAttempts(Platform.OS, dest, label);
+  if (Platform.OS === 'web') {
+    // Keep the app tab alive: open Google Maps directions in a new tab.
+    try {
+      const w = typeof window !== 'undefined' ? window.open(attempts[attempts.length - 1]!, '_blank', 'noopener,noreferrer') : null;
+      if (w) return true;
+    } catch (e) {
+      log.debug('window.open failed', e);
+    }
+  }
   for (const url of attempts) {
     try {
       const can = await Linking.canOpenURL(url);
