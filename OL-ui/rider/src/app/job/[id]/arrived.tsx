@@ -9,8 +9,10 @@ import { useJobActions } from '@/hooks';
 import { useDeliveryStore, selectPosition } from '@/stores';
 import { canCallCustomer, canSeeDropAddress } from '@/domain/privacy';
 import { openDialer } from '@/navigation/openNavigation';
+import { routeForJob } from '@/state-machine/deliveryStateMachine';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
+import { dropAddressLine } from '@/features/delivery/address';
 import { DeliveryStepper, JobBottomDrawer, JobScreenFallback, LabelValue, drawerFooterStyle, figmaText } from '@/features/delivery/components';
 
 /**
@@ -31,7 +33,7 @@ export default function ArrivedScreen() {
 
   const showAddress = canSeeDropAddress(job.state);
   const callable = canCallCustomer(job.state);
-  const address = showAddress ? [job.drop.address, job.drop.flatFloor].filter(Boolean).join(', ') || job.drop.area : job.drop.area;
+  const address = dropAddressLine(job);
 
   const call = async () => {
     setCalling(true);
@@ -50,8 +52,8 @@ export default function ArrivedScreen() {
     setBusy(true);
     lockRedirect();
     try {
-      await step(job, 'handover');
-      router.replace(`/job/${job.id}/proof` as never);
+      const updated = await step(job, 'handover');
+      router.replace(routeForJob(updated) as never);
     } catch (e) {
       unlockRedirect();
       toast.error(errorMessage(e));
@@ -70,7 +72,7 @@ export default function ArrivedScreen() {
         <JobBottomDrawer padding={spacing.x3l} style={styles.drawer}>
           <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerContent} showsVerticalScrollIndicator={false} bounces={false}>
             <View style={styles.address}>
-              <LabelValue label="Drop address" value={address} />
+              <LabelValue label="Drop address" value={address} gap={spacing.xs} />
               {showAddress && job.drop.landmark ? (
                 <AppText variant="bodySm" color="textSecondary">
                   Landmark: {job.drop.landmark}

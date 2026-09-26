@@ -6,20 +6,22 @@ import { colors, spacing } from '@/theme';
 import { AppText, Card, Dot, GhostButton, Icon, PrimaryButton, Screen, toast } from '@/components/ui';
 import { AppHeader } from '@/components/app';
 import { useCountdown, useElapsed, useJobActions } from '@/hooks';
-import { openDialer } from '@/navigation/openNavigation';
+import { routeForJob } from '@/state-machine/deliveryStateMachine';
 import { formatCountdown, formatINR } from '@/utils/format';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
+import { contactMerchant } from '@/features/delivery/merchant';
 import { ActionRow, JobScreenFallback, ReportNoteSheet, figmaText } from '@/features/delivery/components';
-import { WAIT_FREE_MIN, WAIT_FREE_SECONDS, WAIT_PER_MIN, isWaitCompensated, useWaitStore, waitCompensationFor } from '@/features/job/waitStore';
+import { WAIT_FREE_MIN, WAIT_PER_MIN, isWaitCompensated, useWaitStore, waitCompensationFor } from '@/features/job/waitStore';
 
-/** Demo merchant desk number used by "Contact Merchant" (the server never exposes merchant phones to the app). */
-const MERCHANT_DEMO_NUMBER = '+91 98220 11223';
+/** Figma order-not-ready timer colour (#FF4D4D) — not a theme token. */
+const TIMER_RED = '#FF4D4D';
 
 /**
  * Order Not Ready (Figma order-not-ready): elapsed wait timer with the 10 min / ₹2 per min
- * compensation threshold, merchant delay guidance, report / contact actions and the
- * "order is ready" continuation which resolves the wait via the state engine.
+ * compensation badge, the merchant's delay guidance, report / contact rows and the
+ * "I AM STILL WAITING" re-poll. Once the merchant marks the order ready (or the rider
+ * confirms it is) the wait is resolved through the state engine and verification opens.
  */
 export default function OrderNotReadyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,11 +37,12 @@ export default function OrderNotReadyScreen() {
 
   const elapsed = useElapsed(startedAt);
   const readyIn = useCountdown(job?.merchantReadyAt);
-  const ready = !job?.merchantReadyAt || readyIn <= 0;
-  const readyMinutes = Math.max(1, Math.ceil(readyIn / 60));
+  // The merchant's ready time is a server hint; without one the rider decides when the order is ready.
+  const hasEstimate = !!job?.merchantReadyAt;
+  const ready = hasEstimate && readyIn <= 0;
+  const delayMinutes = Math.max(1, Math.ceil(readyIn / 60));
   const compensated = isWaitCompensated(elapsed);
   const earned = waitCompensationFor(elapsed);
-  const progress = Math.min(1, elapsed / WAIT_FREE_SECONDS);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -49,6 +52,7 @@ export default function OrderNotReadyScreen() {
   if (!job) return <JobScreenFallback error={isLoading ? null : error} onRetry={refetch} label="Loading order…" />;
 
   const merchant = job.pickup;
+  const busy = continuing || polling;
 
   const reportDelay = async (note: string | undefined) => {
     setReporting(true);
@@ -64,13 +68,19 @@ export default function OrderNotReadyScreen() {
     }
   };
 
+  /** "I AM STILL WAITING": keep the timer running and re-check the merchant's readiness. */
   const stillWaiting = async () => {
     setPolling(true);
     try {
       const fresh = await refreshFromServer(job.id);
-      const readyNow = !fresh?.merchantReadyAt || new Date(fresh.merchantReadyAt).getTime() <= Date.now();
-      if (readyNow) toast.success('Order is ready — continue to verification');
-      else toast.show(`Still preparing — about ${Math.max(1, Math.ceil((new Date(fresh!.merchantReadyAt!).getTime() - Date.now()) / 60000))} min to go`);
+      if (!fresh) {
+        toast.error('Could not refresh the order status');
+        return;
+      }
+      const readyAt = fresh.merchantReadyAt ? new Date(fresh.merchantReadyAt).getTime() : null;
+      if (readyAt === null) toast.show('Still waiting — the merchant has not confirmed a ready time yet');
+      else if (readyAt <= Date.now()) toast.success('Order is ready — continue to verification');
+      else toast.show(`Still preparing — about ${Math.max(1, Math.ceil((readyAt - Date.now()) / 60000))} min to go`);
     } finally {
       setPolling(false);
     }
@@ -83,7 +93,9 @@ export default function OrderNotReadyScreen() {
       const res = await resolveWait(job, 'not_ready', 'continue');
       if ('queued' in res) toast.show('Saved offline — will sync');
       clearWait(job.id);
-      router.replace(`/job/${job.id}/pickup/verify` as never);
+      // Continuing the wait keeps the job at the store, so verification is next; any other state follows the engine.
+      const state = 'queued' in res ? job.state : res.jobState;
+      router.replace((state === 'at_pickup' ? `/job/${job.id}/pickup/verify` : routeForJob({ id: job.id, state })) as never);
     } catch (e) {
       unlockRedirect();
       toast.error(errorMessage(e));
@@ -97,16 +109,27 @@ export default function OrderNotReadyScreen() {
       scroll
       footer={
         <View style={styles.footer}>
-          <PrimaryButton label="ORDER IS READY" onPress={() => void continueToVerify()} loading={continuing} />
-          {!ready ? <GhostButton label="I AM STILL WAITING" onPress={() => void stillWaiting()} disabled={polling} /> : null}
+          {ready ? (
+            <>
+              <PrimaryButton label="ORDER IS READY" onPress={() => void continueToVerify()} loading={continuing} disabled={polling} />
+              <GhostButton label="I am still waiting" onPress={() => void stillWaiting()} disabled={busy} />
+            </>
+          ) : (
+            <>
+              <PrimaryButton label="I AM STILL WAITING" onPress={() => void stillWaiting()} loading={polling} disabled={continuing} />
+              <GhostButton label="Order is ready — continue" icon="arrow-right" onPress={() => void continueToVerify()} disabled={busy} />
+            </>
+          )}
         </View>
       }>
-      <AppHeader title={ready ? 'Order Ready' : 'Order Not Ready'} onBack={() => (router.canGoBack() ? router.back() : router.replace(`/job/${job.id}/pickup` as never))} onHelp={() => router.push('/support' as never)} />
-      <View style={styles.body}>
+      <View style={styles.headerArea}>
+        <AppHeader title={ready ? 'Order Ready' : 'Order Not Ready'} onBack={() => (router.canGoBack() ? router.back() : router.replace(`/job/${job.id}/pickup` as never))} onHelp={() => router.push('/support' as never)} />
         <AppText variant="body" color="textSecondary">
           {ready ? `${merchant.name} has Order ${job.orderRef} ready for pickup` : `${merchant.name} is preparing Order ${job.orderRef}`}
         </AppText>
+      </View>
 
+      <View style={styles.body}>
         {ready ? (
           <View style={styles.readyBanner} accessibilityRole="alert" accessibilityLiveRegion="polite">
             <Icon name="circle-check" size={20} color="ink" strokeWidth={2.5} />
@@ -118,16 +141,13 @@ export default function OrderNotReadyScreen() {
           <AppText variant="label" color="textSecondary" uppercase>
             Elapsed wait time
           </AppText>
-          <AppText style={figmaText.timer48} color={ready ? colors.ink : '#FF4D4D'} accessibilityLabel={`Elapsed wait time ${formatCountdown(elapsed)}`}>
+          <AppText style={figmaText.timer48} color={ready ? colors.ink : TIMER_RED} accessibilityLabel={`Elapsed wait time ${formatCountdown(elapsed)}`}>
             {formatCountdown(elapsed)}
           </AppText>
           <View style={[styles.badge, compensated ? styles.badgeOn : styles.badgeOff]}>
             <AppText style={figmaText.label11} uppercase>
               {compensated ? 'Wait time compensation enabled' : `Wait compensation after ${WAIT_FREE_MIN} min`}
             </AppText>
-          </View>
-          <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={`${Math.round(progress * 100)}% of the free wait period elapsed`}>
-            <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
           </View>
           <AppText variant="bodySm" color="textSecondary" align="center">
             {compensated ? `Earning ${formatINR(WAIT_PER_MIN)}/min · ${formatINR(earned)} added so far` : `${formatINR(WAIT_PER_MIN)}/min is added after ${WAIT_FREE_MIN} minutes of waiting`}
@@ -141,31 +161,16 @@ export default function OrderNotReadyScreen() {
           </View>
           <AppText style={figmaText.body13} color="textSecondary">
             {ready
-              ? `${merchant.name} has marked Order ${job.orderRef} as ready. Collect it at ${merchant.entranceNote ? merchant.entranceNote.toLowerCase() : 'the counter'} and continue to verification.`
-              : `Merchant confirmed a delay of ~${readyMinutes} minute${readyMinutes === 1 ? '' : 's'}. Your delivery ETA has been automatically adjusted with customer notification.`}
+              ? `${merchant.name} has marked Order ${job.orderRef} as ready. Collect it and continue to verification.`
+              : hasEstimate
+                ? `Merchant confirmed a delay of ~${delayMinutes} minute${delayMinutes === 1 ? '' : 's'}. Your delivery ETA has been automatically adjusted with customer notification.`
+                : 'Merchant has not confirmed a ready time yet. Your delivery ETA will be adjusted automatically with customer notification.'}
           </AppText>
-        </Card>
-
-        <Card radius={32} padding={spacing.xxl} gap={spacing.lg} row style={styles.merchant}>
-          <View style={styles.storeIcon}>
-            <Icon name="store" size={20} />
-          </View>
-          <View style={styles.merchantText}>
-            <AppText variant="titleSm">{merchant.name}</AppText>
-            <AppText variant="bodySm" color="textSecondary">
-              {[merchant.address, merchant.area].filter(Boolean).join(', ')}
-            </AppText>
-            {merchant.entranceNote ? (
-              <AppText variant="bodySm" color="textSecondary">
-                {merchant.entranceNote}
-              </AppText>
-            ) : null}
-          </View>
         </Card>
 
         <View style={styles.actions}>
           <ActionRow icon="alert-triangle" label="Report Delay to Support" onPress={() => setReportOpen(true)} />
-          <ActionRow icon="phone" label="Contact Merchant" onPress={() => void openDialer(MERCHANT_DEMO_NUMBER).then((ok) => !ok && toast.error('Could not open the dialer'))} />
+          <ActionRow icon="phone" label="Contact Merchant" onPress={() => void contactMerchant()} />
         </View>
       </View>
 
@@ -183,7 +188,8 @@ export default function OrderNotReadyScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { gap: spacing.x3l, paddingTop: spacing.lg },
+  headerArea: { gap: spacing.lg },
+  body: { gap: spacing.x3l, paddingTop: spacing.x3l },
   footer: { gap: spacing.xs },
   center: { alignItems: 'center' },
   readyBanner: {
@@ -200,11 +206,6 @@ const styles = StyleSheet.create({
   badge: { borderWidth: 1, borderColor: colors.border, borderRadius: 11.5, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   badgeOn: { backgroundColor: colors.surfaceLime },
   badgeOff: { backgroundColor: colors.surfaceMuted },
-  track: { alignSelf: 'stretch', height: 6, borderRadius: 3, backgroundColor: colors.surfaceMuted, overflow: 'hidden', marginTop: spacing.xs },
-  fill: { height: '100%', backgroundColor: colors.lime, borderRadius: 3 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  merchant: { alignItems: 'center' },
-  storeIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceLime, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  merchantText: { flex: 1, gap: 2 },
   actions: { gap: spacing.base },
 });

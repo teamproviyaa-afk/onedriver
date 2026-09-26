@@ -4,15 +4,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { spacing } from '@/theme';
 import { Card, Divider, GhostButton, SecondaryButton, toast } from '@/components/ui';
-import { FloatingJobHeader } from '@/components/app';
 import { useJobActions } from '@/hooks';
-import { openDialer } from '@/navigation/openNavigation';
-import { canRaiseException } from '@/state-machine/deliveryStateMachine';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
-import { DeliveryStepper, ExceptionBanner, JobDrawerLayout, JobScreenFallback, LabelValue, ReportNoteSheet, TintedButton } from '@/features/delivery/components';
+import { contactMerchant } from '@/features/delivery/merchant';
+import { DeliveryStepper, ExceptionBanner, JobDrawerLayout, JobHeaderCard, JobScreenFallback, LabelValue, ReportNoteSheet, TintedButton } from '@/features/delivery/components';
 
-const MERCHANT_DEMO_NUMBER = '+91 98220 11223';
+/** Figma package-mismatch accent (#F44). */
 const RED = '#FF4444';
 
 /**
@@ -35,11 +33,9 @@ export default function PackageMismatchScreen() {
   const report = async (note: string | undefined) => {
     setReporting(true);
     try {
-      // The engine only allows `mismatch` once the pickup is verified; while still at
-      // the store the same report goes through the generic branch with a full note.
-      const kind = canRaiseException(job.state, 'mismatch') ? 'mismatch' : 'other';
+      // The engine accepts `mismatch` both while checking at the store and after verification.
       const detail = `Package mismatch — expected ${expectedSku}, scanned ${scannedSku}`;
-      const res = await raiseException(job, kind, { note: note ? `${detail}. ${note}` : detail });
+      const res = await raiseException(job, 'mismatch', { note: note ? `${detail}. ${note}` : detail });
       setReportOpen(false);
       setReported(true);
       if ('queued' in res) toast.show('Saved offline — will sync');
@@ -59,17 +55,17 @@ export default function PackageMismatchScreen() {
           <Divider />
           <View style={styles.actions}>
             <TintedButton label={reported ? 'REPORTED TO OPERATIONS' : 'REPORT WRONG BARCODE'} background={RED} onPress={() => setReportOpen(true)} disabled={reported} />
-            <SecondaryButton label="CONTACT MERCHANT" onPress={() => void openDialer(MERCHANT_DEMO_NUMBER).then((ok) => !ok && toast.error('Could not open the dialer'))} />
+            <SecondaryButton label="CONTACT MERCHANT" onPress={() => void contactMerchant()} />
             <GhostButton label="Scan again" icon="scan-line" iconPosition="left" onPress={() => router.replace(`/job/${job.id}/pickup/verify` as never)} />
           </View>
         </>
       }>
-      <FloatingJobHeader label="CURRENT JOB" orderRef={job.orderRef} payout={job.payoutEstimate} radius={35.5} />
+      <JobHeaderCard label="CURRENT JOB" orderRef={job.orderRef} payout={job.payoutEstimate} />
       <ExceptionBanner tone="danger" icon="alert-triangle" title="Package mismatch" body="Scanned barcode does not match merchant inventory record." />
       <Card radius={32} padding={spacing.xxl} gap={spacing.lg}>
-        <LabelValue label="Expected SKU" value={expectedSku} />
+        <LabelValue label="Expected SKU" value={expectedSku} gap={spacing.xs} />
         <Divider />
-        <LabelValue label="Scanned SKU" value={scannedSku} color={RED} labelColor={RED} />
+        <LabelValue label="Scanned SKU" value={scannedSku} color={RED} labelColor={RED} gap={spacing.xs} />
       </Card>
 
       <ReportNoteSheet

@@ -4,16 +4,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { colors, spacing } from '@/theme';
 import { AppText, Card, Divider, Dot, GhostButton, SecondaryButton, toast } from '@/components/ui';
-import { FloatingJobHeader } from '@/components/app';
 import { useJobActions } from '@/hooks';
-import { openDialer } from '@/navigation/openNavigation';
-import { canRaiseException } from '@/state-machine/deliveryStateMachine';
 import type { JobItem } from '@/types';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
-import { DeliveryStepper, ExceptionBanner, JobDrawerLayout, JobScreenFallback, ReportNoteSheet, TintedButton } from '@/features/delivery/components';
+import { contactMerchant } from '@/features/delivery/merchant';
+import { DeliveryStepper, ExceptionBanner, JobDrawerLayout, JobHeaderCard, JobScreenFallback, ReportNoteSheet, TintedButton } from '@/features/delivery/components';
 
-const MERCHANT_DEMO_NUMBER = '+91 98220 11223';
+/** Figma package-incomplete accents: amber CTA / banner (#FFB300) and the red missing row (#F44). */
 const AMBER = '#FFB300';
 const RED = '#FF4444';
 
@@ -58,10 +56,10 @@ export default function PackageIncompleteScreen() {
   const report = async (note: string | undefined) => {
     setReporting(true);
     try {
-      const kind = canRaiseException(job.state, 'incomplete') ? 'incomplete' : 'other';
+      // The engine accepts `incomplete` both while checking at the store and after verification.
       const names = missing.map((m) => `${m.name} (${m.qty}x)`).join(', ');
       const detail = `Package incomplete — ${missingCount} item${missingCount === 1 ? '' : 's'} missing${names ? `: ${names}` : ''}`;
-      const res = await raiseException(job, kind, { note: note ? `${detail}. ${note}` : detail });
+      const res = await raiseException(job, 'incomplete', { note: note ? `${detail}. ${note}` : detail });
       setReportOpen(false);
       setReported(true);
       if ('queued' in res) toast.show('Saved offline — will sync');
@@ -81,7 +79,7 @@ export default function PackageIncompleteScreen() {
           <Divider />
           <View style={styles.actions}>
             <TintedButton label={reported ? 'REPORTED TO OPERATIONS' : 'REPORT INCOMPLETE'} background={AMBER} color={colors.ink} onPress={() => setReportOpen(true)} disabled={reported} />
-            <SecondaryButton label="CONTACT MERCHANT" onPress={() => void openDialer(MERCHANT_DEMO_NUMBER).then((ok) => !ok && toast.error('Could not open the dialer'))} />
+            <SecondaryButton label="CONTACT MERCHANT" onPress={() => void contactMerchant()} />
             <View style={styles.links}>
               <GhostButton label="Re-check items" icon="list-checks" iconPosition="left" onPress={() => router.replace(`/job/${job.id}/pickup` as never)} />
               <GhostButton label="Continue with available items" icon="arrow-right" onPress={() => router.replace(`/job/${job.id}/pickup/verify?bypass=1` as never)} />
@@ -89,7 +87,7 @@ export default function PackageIncompleteScreen() {
           </View>
         </>
       }>
-      <FloatingJobHeader label="CURRENT JOB" orderRef={job.orderRef} payout={job.payoutEstimate} radius={35.5} />
+      <JobHeaderCard label="CURRENT JOB" orderRef={job.orderRef} payout={job.payoutEstimate} />
       <ExceptionBanner
         tone="warning"
         icon="alert-octagon"
@@ -133,6 +131,6 @@ export default function PackageIncompleteScreen() {
 const styles = StyleSheet.create({
   actions: { gap: spacing.lg, alignSelf: 'stretch' },
   links: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' },
-  item: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  item: { flexDirection: 'row', alignItems: 'center', gap: spacing.base },
   itemText: { flex: 1 },
 });

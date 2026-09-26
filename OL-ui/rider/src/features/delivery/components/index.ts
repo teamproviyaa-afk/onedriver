@@ -2,6 +2,7 @@ export { JobBottomDrawer, JobDrawerLayout, drawerFooterStyle } from './JobBottom
 export { DeliveryStepper, deliveryStepsFor, type DeliveryPhase } from './DeliveryStepper';
 export { ExceptionBanner, type ExceptionTone } from './ExceptionBanner';
 export { LabelValue } from './LabelValue';
+export { JobHeaderCard } from './JobHeaderCard';
 export { TintedButton } from './TintedButton';
 export { ActionRow } from './ActionRow';
 export { ReportNoteSheet } from './ReportNoteSheet';

@@ -4,14 +4,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 
 import { spacing } from '@/theme';
 import { AppText, Card, Divider, PrimaryButton, toast } from '@/components/ui';
-import { FloatingJobHeader, SOSButton } from '@/components/app';
+import { SOSButton } from '@/components/app';
 import { useJobActions } from '@/hooks';
 import { canSeeDropAddress } from '@/domain/privacy';
 import { openNavigation } from '@/navigation/openNavigation';
+import { routeForJob } from '@/state-machine/deliveryStateMachine';
 import { formatKm } from '@/utils/format';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
-import { DeliveryStepper, ExceptionBanner, JobDrawerLayout, JobScreenFallback, LabelValue } from '@/features/delivery/components';
+import { dropAddressLine } from '@/features/delivery/address';
+import { DeliveryStepper, ExceptionBanner, JobDrawerLayout, JobHeaderCard, JobScreenFallback, LabelValue } from '@/features/delivery/components';
 
 const MAP_BACKGROUND = require('@/assets/figma/map-background.png');
 const ELLIPSE_BLOB = require('@/assets/figma/nav-ellipse-blob.png');
@@ -30,16 +32,17 @@ export default function NavigationHandoffScreen() {
   if (!job) return <JobScreenFallback error={isLoading ? null : error} onRetry={refetch} />;
 
   const showAddress = canSeeDropAddress(job.state);
-  const destination = showAddress ? [job.drop.address, job.drop.flatFloor].filter(Boolean).join(', ') || job.drop.area : job.drop.area;
+  const destination = dropAddressLine(job);
 
   const startNavigation = async () => {
     setBusy(true);
     lockRedirect();
     try {
-      await step(job, 'to_drop');
+      const updated = await step(job, 'to_drop');
+      // Navigation runs on coordinates; the label only names the area in the maps app.
       const opened = await openNavigation({ lat: job.drop.lat, lng: job.drop.lng }, job.drop.area);
       if (!opened) toast.error('Could not open a navigation app');
-      router.replace(`/job/${job.id}` as never);
+      router.replace(routeForJob(updated) as never);
     } catch (e) {
       unlockRedirect();
       toast.error(errorMessage(e));
@@ -61,9 +64,9 @@ export default function NavigationHandoffScreen() {
       <Image source={MAP_BACKGROUND} style={styles.map} resizeMode="cover" accessibilityIgnoresInvertColors />
       <Image source={ELLIPSE_BLOB} style={styles.blob} resizeMode="stretch" />
       <View style={styles.top}>
-        <FloatingJobHeader label="TRANSIT READY" orderRef={job.orderRef} payout={job.payoutEstimate} radius={35.5} />
+        <JobHeaderCard label="TRANSIT READY" orderRef={job.orderRef} payout={job.payoutEstimate} />
         <View style={styles.sosRow}>
-          <SOSButton jobId={job.id} />
+          <SOSButton jobId={job.id} compact />
         </View>
         <View style={styles.spacer} />
         <ExceptionBanner tone="success" icon="circle-check" title="Package picked up" body="Merchant verification passed. Proceed to destination." />

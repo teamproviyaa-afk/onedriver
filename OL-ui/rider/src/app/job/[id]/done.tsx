@@ -72,7 +72,7 @@ export default function DeliverySuccessScreen() {
       scroll
       footer={
         <View style={styles.footer}>
-          <TintedButton label="BACK TO HOME" background={colors.ink} color={colors.surface} radius={27} height={56} textVariant="buttonSecondary" onPress={backHome} />
+          <TintedButton label="BACK TO HOME" background={colors.ink} color={colors.surface} radius={27} textVariant="buttonSecondary" onPress={backHome} />
           <GhostButton label="View breakdown" icon="chevron-right" onPress={() => router.push(`/earnings/job/${id}` as never)} />
         </View>
       }>
@@ -108,7 +108,7 @@ export default function DeliverySuccessScreen() {
               <AppText variant="title">Daily Target Bonus Unlocked</AppText>
             </View>
             <AppText style={figmaText.body13} color="textSecondary">
-              You have completed {todayJobs} deliver{todayJobs === 1 ? 'y' : 'ies'} today. Extra {formatINR(bonus)} added to active wallets!
+              You have completed {todayJobs} consecutive deliver{todayJobs === 1 ? 'y' : 'ies'} today. Extra {formatINR(bonus)} added to active wallets!
             </AppText>
           </View>
         ) : tip > 0 ? (
