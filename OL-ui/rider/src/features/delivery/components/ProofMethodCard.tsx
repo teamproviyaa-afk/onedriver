@@ -12,7 +12,7 @@ export interface ProofMethodCardProps {
   onPress: () => void;
 }
 
-/** Selectable verification-method row (delivery-confirmation): icon + text block + radio dot, radius 35. */
+/** Selectable verification-method row (delivery-confirmation): icon + text block + radio dot, radius 35. Selection is shown by the lime radio only (the 2px #DBE0D6 border is constant in Figma). */
 export const ProofMethodCard = ({ icon, title, subtitle, selected, disabled, onPress }: ProofMethodCardProps) => (
   <Pressable
     accessibilityRole="radio"
@@ -20,7 +20,7 @@ export const ProofMethodCard = ({ icon, title, subtitle, selected, disabled, onP
     accessibilityState={{ selected, disabled: !!disabled, checked: selected }}
     disabled={disabled}
     onPress={onPress}
-    style={({ pressed }) => [styles.card, selected && styles.cardSelected, disabled && styles.disabled, pressed && !disabled && styles.pressed]}>
+    style={({ pressed }) => [styles.card, disabled && styles.disabled, pressed && !disabled && styles.pressed]}>
     <View style={styles.left}>
       <Icon name={icon} size={24} color={disabled ? 'textMuted' : 'ink'} />
       <View style={styles.text}>
@@ -50,7 +50,6 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     minHeight: 72,
   },
-  cardSelected: { borderColor: colors.lime },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.9 },
   left: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, flexShrink: 1 },

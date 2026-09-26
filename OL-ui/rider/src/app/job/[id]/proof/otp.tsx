@@ -12,8 +12,8 @@ import { getDemoProvider } from '@/providers';
 import { isLocalDemo } from '@/config/env';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
-import { finishProof, type ProofSubmission } from '@/features/delivery/proof';
-import { DeliveryStepper, JobDrawerLayout, JobScreenFallback } from '@/features/delivery/components';
+import { allowedProofMethods, finishProof, type ProofSubmission } from '@/features/delivery/proof';
+import { DeliveryStepper, JobDrawerLayout, JobScreenFallback, figmaText } from '@/features/delivery/components';
 
 /**
  * OTP proof (Figma proof-otp): the rider keys in the 4-digit code the customer received
@@ -40,6 +40,12 @@ export default function ProofOtpScreen() {
       cancelled = true;
     };
   }, [id]);
+
+  // OTP is only offered when the order allows it; a locked OTP still renders (photo fallback below).
+  const otpAllowed = !job || job.otpLocked || allowedProofMethods(job).includes('otp');
+  useEffect(() => {
+    if (job && !otpAllowed) router.replace(`/job/${job.id}/proof` as never);
+  }, [job, otpAllowed]);
 
   if (!job) return <JobScreenFallback error={isLoading ? null : error} onRetry={refetch} />;
 
@@ -88,7 +94,7 @@ export default function ProofOtpScreen() {
       <FloatingJobHeader label="VERIFICATION" orderRef={job.orderRef} payout={job.payoutEstimate} radius={35.5} />
       <View style={styles.heading}>
         <AppText variant="h4">Enter Customer OTP</AppText>
-        <AppText variant="bodySm" color="textSecondary">
+        <AppText style={figmaText.body13} color="textSecondary">
           {OTP.deliveryLength}-digit verification code has been shared with {job.drop.customerFirstName}.
         </AppText>
       </View>
@@ -120,7 +126,14 @@ export default function ProofOtpScreen() {
               Demo OTP: {demoOtp}
             </AppText>
           ) : null}
-          <NumericKeypad onDigit={(d) => setCode((c) => (c.length < OTP.deliveryLength ? c + d : c))} onDelete={() => setCode((c) => c.slice(0, -1))} disabled={busy} />
+          <NumericKeypad
+            onDigit={(d) => {
+              setMessage(null);
+              setCode((c) => (c.length < OTP.deliveryLength ? c + d : c));
+            }}
+            onDelete={() => setCode((c) => c.slice(0, -1))}
+            disabled={busy}
+          />
         </>
       )}
     </JobDrawerLayout>
@@ -128,7 +141,7 @@ export default function ProofOtpScreen() {
 }
 
 const styles = StyleSheet.create({
-  heading: { gap: spacing.xs },
+  heading: { gap: spacing.md },
   lockedCard: { alignSelf: 'stretch' },
   lockedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
 });

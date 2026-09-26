@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { AppText, Divider, PrimaryButton, toast } from '@/components/ui';
 import { FloatingJobHeader, SignaturePad } from '@/components/app';
@@ -8,7 +8,7 @@ import { useJobActions } from '@/hooks';
 import { getDataProvider } from '@/providers';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
-import { finishProof, type ProofSubmission } from '@/features/delivery/proof';
+import { allowedProofMethods, finishProof, type ProofSubmission } from '@/features/delivery/proof';
 import { DeliveryStepper, JobDrawerLayout, JobScreenFallback } from '@/features/delivery/components';
 
 /**
@@ -22,6 +22,12 @@ export default function ProofSignatureScreen() {
   const exportRef = useRef<(() => Promise<string | null>) | null>(null);
   const [hasStrokes, setHasStrokes] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // Signature proof must be one of the order's methods.
+  const signatureAllowed = !job || allowedProofMethods(job).includes('signature');
+  useEffect(() => {
+    if (job && !signatureAllowed) router.replace(`/job/${job.id}/proof` as never);
+  }, [job, signatureAllowed]);
 
   if (!job) return <JobScreenFallback error={isLoading ? null : error} onRetry={refetch} />;
 

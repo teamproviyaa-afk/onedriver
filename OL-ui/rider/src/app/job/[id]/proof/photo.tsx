@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { spacing } from '@/theme';
 import { AppText, Divider, Icon, PrimaryButton, SecondaryButton, toast } from '@/components/ui';
@@ -9,7 +9,7 @@ import { useJobActions } from '@/hooks';
 import { getDataProvider } from '@/providers';
 import { useJobScreen } from '@/features/delivery/useJobScreen';
 import { errorMessage } from '@/features/delivery/errors';
-import { finishProof, type ProofSubmission } from '@/features/delivery/proof';
+import { allowedProofMethods, finishProof, type ProofSubmission } from '@/features/delivery/proof';
 import { DeliveryStepper, JobDrawerLayout, JobScreenFallback } from '@/features/delivery/components';
 
 const PLACEHOLDER = require('@/assets/figma/proof-photo-preview.png') as number;
@@ -27,6 +27,12 @@ export default function ProofPhotoScreen() {
   const [capturing, setCapturing] = useState(false);
   const [busy, setBusy] = useState(false);
   const onChange = useCallback((uri: string | null) => setPhoto(uri), []);
+
+  // Photo proof must be one of the order's methods (it is always unlocked once the OTP is locked).
+  const photoAllowed = !job || allowedProofMethods(job).includes('photo');
+  useEffect(() => {
+    if (job && !photoAllowed) router.replace(`/job/${job.id}/proof` as never);
+  }, [job, photoAllowed]);
 
   if (!job) return <JobScreenFallback error={isLoading ? null : error} onRetry={refetch} />;
 
