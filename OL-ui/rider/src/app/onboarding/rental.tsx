@@ -22,13 +22,16 @@ const LISTINGS: Listing[] = [
   { id: 'yulu', name: 'Yulu Wynn Solo', deposit: 'Deposit: ₹500 refundable', rate: '₹99/day', tags: ['80km range', 'GPS Tracked'], image: require('@/assets/figma/rental-scooter-2.png'), featured: false },
 ];
 
-/** rental-marketplace: V2 preview. Listings are shown but not selectable; every action explains "coming soon". */
+/**
+ * rental-marketplace: V2 preview (COMING SOON). Listings are shown but not selectable; "View Plans" and
+ * "Rent & Start Onboarding" open the coming-soon sheet, which sends the rider back to register an owned vehicle.
+ */
 export default function RentalScreen() {
   const [comingSoon, setComingSoon] = useState<string | null>(null);
   const back = () => (router.canGoBack() ? router.back() : router.replace('/onboarding/vehicle' as never));
 
   return (
-    <Screen scroll contentStyle={styles.content} footer={<PrimaryButton label="Back to vehicle" icon="arrow-left" iconPosition="left" onPress={back} />}>
+    <Screen scroll contentStyle={styles.content} footer={<PrimaryButton label="Rent & Start Onboarding" onPress={() => setComingSoon('Partner')} />}>
       <OnboardingHeader title="Rental Marketplace" subtitle="Select a verified partner EV. All rates include zero maintenance costs." backIcon="chevron-left" onBack={back} />
 
       <InfoBanner tone="dark" icon="sparkles" text="COMING SOON (V2) — partner rentals open in the next release. Register your own vehicle to start now." />
@@ -79,7 +82,12 @@ export default function RentalScreen() {
         icon="bike"
         title="Rentals are coming soon"
         body={`${comingSoon ?? 'Partner'} plans open in V2. For now, register a vehicle you own to go online.`}
-        cancelLabel="Back to vehicle"
+        confirmLabel="Register my own vehicle"
+        onConfirm={() => {
+          setComingSoon(null);
+          back();
+        }}
+        cancelLabel="Keep browsing"
       />
     </Screen>
   );

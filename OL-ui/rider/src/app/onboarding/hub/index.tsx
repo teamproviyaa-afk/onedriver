@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { colors, spacing } from '@/theme';
-import { AppText, GhostButton, Icon, LoadingState, PrimaryButton, Screen, toast } from '@/components/ui';
+import { AppText, ErrorState, GhostButton, Icon, LoadingState, PrimaryButton, Screen, toast } from '@/components/ui';
 import { MapFallback, RiderMap, nativeMapAvailable } from '@/components/app';
 import { useZones } from '@/hooks';
 import { useDeliveryStore } from '@/stores/useDeliveryStore';
@@ -25,6 +25,8 @@ export default function HubScreen() {
   const complete = useOnboardingStore((s) => s.complete);
   const zones = useZones(cityId);
   const zone = zones.data?.find((z) => z.id === zoneId);
+  // The zone step was skipped or its draft no longer matches the city's zones.
+  const zoneMissing = !cityId || !zoneId || (zones.isSuccess && !zone);
 
   const [address, setAddress] = useState(draftHub?.address ?? '');
   const [landmark, setLandmark] = useState(draftHub?.landmark ?? '');
@@ -69,6 +71,11 @@ export default function HubScreen() {
       setAddressError('Enter the address or landmark where you start your day.');
       return;
     }
+    if (zoneMissing) {
+      toast.show('Pick your zone first — the hub must sit inside it.', 'warning');
+      router.replace('/onboarding/zone' as never);
+      return;
+    }
     if (!effectivePin) {
       toast.show('Waiting for your location — drop the pin first.', 'warning');
       return;
@@ -109,25 +116,38 @@ export default function HubScreen() {
           </AppText>
           <GhostButton label="Use my location" icon="locate" iconPosition="left" onPress={() => void locateMe()} disabled={locating} />
         </View>
-        <View style={styles.mapCard}>
-          {!effectivePin ? (
+        {effectivePin ? (
+          <View style={styles.mapCard}>
+            {nativeMapAvailable ? (
+              <RiderMap draggablePin={effectivePin} onPinDragEnd={setPin} zoneBoundary={zone?.boundary} focus="all" height={200} />
+            ) : (
+              // Web / no map provider: the Figma map drawing with the start pin drawn over it.
+              <>
+                <MapFallback height={200} />
+                <View pointerEvents="none" style={styles.pinOverlay}>
+                  <Icon name="map-pin" size={36} fill={colors.lime} />
+                </View>
+              </>
+            )}
+          </View>
+        ) : zones.isError ? (
+          <ErrorState compact title="Couldn't load your zone" body="Check your connection and try again." onRetry={() => void zones.refetch()} />
+        ) : zoneMissing ? (
+          <ErrorState compact title="Zone not selected" body="Pick your zone first so we can place your start pin inside it." onRetry={() => router.replace('/onboarding/zone' as never)} retryLabel="Choose zone" />
+        ) : (
+          <View style={styles.mapCard}>
             <LoadingState label={locating ? 'Locating you…' : 'Waiting for your zone…'} compact style={styles.mapLoading} />
-          ) : nativeMapAvailable ? (
-            <RiderMap draggablePin={effectivePin} onPinDragEnd={setPin} zoneBoundary={zone?.boundary} focus="all" height={200} />
-          ) : (
-            <>
-              <MapFallback height={200} />
-              <View pointerEvents="none" style={styles.pinOverlay}>
-                <Icon name="map-pin" size={36} fill={colors.lime} />
-              </View>
-            </>
-          )}
-        </View>
-        <AppText variant="bodySm" color="textSecondary">
-          {nativeMapAvailable ? 'Drag the pin to the exact spot you start from. ' : ''}
-          {effectivePin ? `Pin: ${effectivePin.lat.toFixed(5)}, ${effectivePin.lng.toFixed(5)}` : ''}
-        </AppText>
+          </View>
+        )}
+        {effectivePin ? (
+          <AppText variant="bodySm" color="textSecondary">
+            {nativeMapAvailable ? 'Drag the pin to the exact spot you start from. ' : ''}
+            {`Pin: ${effectivePin.lat.toFixed(5)}, ${effectivePin.lng.toFixed(5)}`}
+          </AppText>
+        ) : null}
       </View>
+
+      <View style={styles.flex} />
 
       <View style={styles.infoBox}>
         <Icon name="map-pin" size={20} />
@@ -141,6 +161,7 @@ export default function HubScreen() {
 
 const styles = StyleSheet.create({
   content: { gap: spacing.x3l },
+  flex: { flex: 1 },
   form: { gap: spacing.xxl },
   mapBlock: { gap: spacing.md },
   mapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

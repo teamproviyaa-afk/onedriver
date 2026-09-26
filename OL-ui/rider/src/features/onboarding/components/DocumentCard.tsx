@@ -16,8 +16,6 @@ export interface DocumentCardProps {
   busy?: boolean;
 }
 
-const TRAIL = ['Submitted', 'Under review', 'Verified'] as const;
-
 const actionLabel = (status: DocumentCardStatus): string | null => {
   switch (status) {
     case 'todo':
@@ -75,34 +73,11 @@ const StateGlyph = ({ status, index, variant }: { status: DocumentCardStatus; in
   );
 };
 
-/** Per-document progress chips: Submitted → Under review → Verified (rejected replaces the last chip). */
-const ProgressTrail = ({ status }: { status: DocumentCardStatus }) => {
-  if (status === 'todo') return null;
-  const failed = status === 'rejected' || status === 'expired';
-  const reached = status === 'verified' ? 3 : status === 'pending' ? 2 : 1;
-  return (
-    <View style={styles.trail} accessibilityLabel={`Document status: ${failed ? status : TRAIL[reached - 1]}`}>
-      {TRAIL.map((label, i) => {
-        const isLast = i === TRAIL.length - 1;
-        const text = failed && isLast ? (status === 'expired' ? 'Expired' : 'Rejected') : label;
-        const done = i < reached - 1 || (status === 'verified' && isLast);
-        const active = i === reached - 1 && !failed;
-        const color = failed && isLast ? colors.danger : done ? colors.ink : active ? colors.lime : colors.border;
-        return (
-          <View key={label} style={styles.trailItem}>
-            {i > 0 ? <View style={[styles.trailLine, { backgroundColor: done || active ? colors.ink : colors.border }]} /> : null}
-            <View style={[styles.trailDot, { backgroundColor: color, borderColor: active ? colors.ink : color }]} />
-            <AppText variant="labelXs" color={failed && isLast ? 'danger' : done || active ? 'ink' : 'textMuted'} style={styles.trailText}>
-              {text}
-            </AppText>
-          </View>
-        );
-      })}
-    </View>
-  );
-};
-
-/** KYC checklist card (store-kyc check-card / solo-kyc step-card) with state glyph, copy, progress trail and inline action pill. */
+/**
+ * KYC checklist card (store-kyc check-card / solo-kyc step-card): state glyph, title + status subtitle and the
+ * inline action pill (dark START while a step is open, white EDIT / RE-UPLOAD afterwards). The subtitle carries
+ * the document's review status, matching the Figma two-line cards.
+ */
 export const DocumentCard = ({ index, title, subtitle, status, variant, onAction, busy }: DocumentCardProps) => {
   const solo = variant === 'solo';
   const label = actionLabel(status);
@@ -116,7 +91,6 @@ export const DocumentCard = ({ index, title, subtitle, status, variant, onAction
         <AppText variant="bodySm" color="textSecondary" style={styles.subtitle}>
           {subtitle}
         </AppText>
-        <ProgressTrail status={status} />
       </View>
       {label && onAction ? (
         <Pressable
@@ -156,14 +130,10 @@ const styles = StyleSheet.create({
   circleLime: { backgroundColor: colors.lime },
   circleDanger: { backgroundColor: colors.surfaceDanger, borderColor: colors.surfaceDanger },
   circleNumber: { fontSize: 11, lineHeight: 13, color: '#000000' },
-  trail: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs, flexWrap: 'wrap' },
-  trailItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  trailLine: { width: 10, height: 1 },
-  trailDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1 },
-  trailText: { fontSize: 9, lineHeight: 12 },
-  action: { minHeight: 32, minWidth: 44, borderRadius: 100, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.base, paddingVertical: spacing.xs },
-  actionDark: { backgroundColor: colors.darkAction },
-  actionLight: { backgroundColor: colors.surface, ...shadows.soft },
-  startText: { fontSize: 14, lineHeight: 18 },
+  // Figma: START pill bg #0C1F15 px 10 (Inter Bold 16 lime) · EDIT pill white px 8 py 4 with soft shadow (ExtraBold 10).
+  action: { minHeight: 32, minWidth: 44, borderRadius: 100, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xs },
+  actionDark: { backgroundColor: colors.darkAction, paddingHorizontal: spacing.base },
+  actionLight: { backgroundColor: colors.surface, paddingHorizontal: spacing.md, ...shadows.soft },
+  startText: { fontSize: 16, lineHeight: 20 },
   pressed: { opacity: 0.85 },
 });

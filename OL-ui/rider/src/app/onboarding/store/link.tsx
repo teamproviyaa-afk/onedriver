@@ -86,7 +86,7 @@ export default function StoreLinkScreen() {
             <AppText variant="labelXs" color="textSecondary" style={styles.eyebrow} uppercase>
               Matched merchant
             </AppText>
-            <View style={styles.activeBadge}>
+            <View style={[styles.statusBadge, match.status === 'active' ? styles.statusActive : styles.statusOther]} accessibilityLabel={`Store status: ${match.status}`}>
               <AppText variant="labelXs" uppercase>
                 {match.status}
               </AppText>
@@ -115,7 +115,10 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.border, borderRadius: 32, padding: 18, gap: spacing.lg },
   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { fontSize: 11, lineHeight: 14 },
-  activeBadge: { backgroundColor: 'rgba(118, 236, 0, 0.13)', borderRadius: 11, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  // Figma verified-badge: translucent brand green (rgba(118,236,0,0.13)), radius 11, px 8 py 4, ExtraBold 10 ink.
+  statusBadge: { borderRadius: 11, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  statusActive: { backgroundColor: 'rgba(118, 236, 0, 0.13)' },
+  statusOther: { backgroundColor: colors.surfaceMuted },
   storeInfo: { gap: spacing.xxs },
   storeMeta: { fontSize: 13, lineHeight: 18 },
   managerLine: { fontSize: 12, lineHeight: 17 },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
@@ -15,6 +15,9 @@ import { OnboardingHeader, ZoneOption, titleCaseId } from '@/features/onboarding
 /** City used for the zone list when the rider is outside every zone (V1 launches in Latur). */
 const FALLBACK_CITY_ID = 'latur';
 
+/** V1 launches in Maharashtra; the live state name replaces it once the zone lookup answers. */
+const FALLBACK_STATE_NAME = 'Maharashtra';
+
 type Phase =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
@@ -28,15 +31,16 @@ export default function ZoneScreen() {
   const draftZoneId = useOnboardingStore((s) => s.zoneId);
   const patch = useOnboardingStore((s) => s.patch);
   const complete = useOnboardingStore((s) => s.complete);
-  const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
+  // The lookup result is keyed by attempt so a retry derives "loading" instead of resetting state in the effect.
+  const [result, setResult] = useState<{ attempt: number; phase: Phase } | null>(null);
   const [selectedId, setSelectedId] = useState<string | undefined>(draftZoneId);
   const [here, setHere] = useState<LatLng | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const phase: Phase = result && result.attempt === attempt ? result.phase : { kind: 'loading' };
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setPhase({ kind: 'loading' });
       try {
         const provider = getDataProvider();
         // Read the position once (no subscription): the last fix from the location engine, else a fresh one.
@@ -50,10 +54,10 @@ export default function ZoneScreen() {
         const cityName = inZone?.city.name ?? nearest?.name ?? titleCaseId(FALLBACK_CITY_ID);
         const zones = await provider.listZones(cityId);
         if (cancelled) return;
-        setPhase({ kind: 'ready', lookup, zones, cityId, cityName, stateName: inZone?.state.name });
+        setResult({ attempt, phase: { kind: 'ready', lookup, zones, cityId, cityName, stateName: inZone?.state.name } });
         setSelectedId((current) => (current && zones.some((z) => z.id === current) ? current : (inZone?.zone.id ?? undefined)));
       } catch (e) {
-        if (!cancelled) setPhase({ kind: 'error', message: e instanceof Error ? e.message : 'Could not detect your zone' });
+        if (!cancelled) setResult({ attempt, phase: { kind: 'error', message: e instanceof Error ? e.message : 'Could not detect your zone' } });
       }
     })();
     return () => {
@@ -61,9 +65,10 @@ export default function ZoneScreen() {
     };
   }, [attempt]);
 
-  const selected = useMemo(() => (phase.kind === 'ready' ? phase.zones.find((z) => z.id === selectedId) : undefined), [phase, selectedId]);
+  const selected = phase.kind === 'ready' ? phase.zones.find((z) => z.id === selectedId) : undefined;
   const inZone = phase.kind === 'ready' && phase.lookup?.status === 'in_zone';
   const noLocation = phase.kind === 'ready' && phase.lookup === null;
+  const stateName = (phase.kind === 'ready' && phase.stateName) || FALLBACK_STATE_NAME;
 
   const onContinue = () => {
     if (phase.kind !== 'ready' || !selected) return;
@@ -76,8 +81,8 @@ export default function ZoneScreen() {
     <Screen
       scroll
       contentStyle={styles.content}
-      footer={<PrimaryButton label={selected ? `Confirm ${selected.name}` : 'Select a zone'} onPress={onContinue} disabled={!selected} />}>
-      <OnboardingHeader title="Your Location" subtitle="Select your operational region inside Maharashtra to fetch localized high-pay tasks." />
+      footer={<PrimaryButton label={selected ? `Confirm ${stateName} Zone` : 'Select a zone'} onPress={onContinue} disabled={!selected} />}>
+      <OnboardingHeader title="Your Location" subtitle={`Select your operational region inside ${stateName} to fetch localized high-pay tasks.`} />
 
       {phase.kind === 'loading' ? (
         <LoadingState label="Detecting your zone…" compact />

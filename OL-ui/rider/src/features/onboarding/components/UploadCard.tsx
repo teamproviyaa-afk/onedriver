@@ -31,12 +31,13 @@ export const UploadCard = ({ title, subtitle, onPress, dashed, photoUri, busy }:
       </View>
     )}
     <View style={styles.text}>
-      <AppText variant="title">{title}</AppText>
+      {/* store-vehicle title is ExtraBold 14; solo-vehicle's solid card uses ExtraBold 13. */}
+      <AppText variant={dashed ? 'title' : 'titleSm'}>{title}</AppText>
       <AppText variant="bodySm" color="textSecondary" style={styles.subtitle}>
         {photoUri ? 'Photo added · tap to retake' : subtitle}
       </AppText>
     </View>
-    {photoUri ? <Icon name="circle-check" size={22} color="success" /> : <Icon name="chevron-right" size={18} color="textSecondary" />}
+    {photoUri ? <Icon name="circle-check" size={22} color="success" /> : null}
   </Pressable>
 );
 
