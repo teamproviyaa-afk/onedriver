@@ -31,7 +31,7 @@ npx eas-cli@latest login
 npx eas-cli@latest build --platform android --profile preview   # eas.json → buildType "apk"
 ```
 
-EAS prints a download link and QR code for the `.apk` when the build finishes.
+On the first build EAS asks to create a project (answer **Yes**; it saves `extra.eas.projectId` into `app.json`) and to generate an Android keystore (answer **Yes**). EAS prints a download link and QR code for the `.apk` when the build finishes.
 
 **Local build** (Android Studio with SDK 36 + NDK 27.1, JDK 17, `ANDROID_HOME` set):
 

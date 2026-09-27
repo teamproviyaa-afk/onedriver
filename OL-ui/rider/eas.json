@@ -1,5 +1,5 @@
 {
-  "cli": { "version": ">= 12.0.0" },
+  "cli": { "version": ">= 12.0.0", "appVersionSource": "local" },
   "build": {
     "development": { "developmentClient": true, "distribution": "internal", "env": { "APP_ENV": "local", "DATA_MODE": "local_demo" } },
     "preview": { "distribution": "internal", "android": { "buildType": "apk" }, "env": { "APP_ENV": "local", "DATA_MODE": "local_demo" } },

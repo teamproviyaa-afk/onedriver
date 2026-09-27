@@ -114,7 +114,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true,
     reactCompiler: true,
   },
+  // EAS writes extra.eas.projectId into app.json on the first `eas build`; keep it.
   extra: {
-    eas: {},
+    ...config.extra,
+    eas: { ...(config.extra?.eas as Record<string, unknown> | undefined) },
   },
 });
