@@ -37,6 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
+    // Added by expo-camera / the native template but never used by the rider app.
+    blockedPermissions: ['android.permission.RECORD_AUDIO', 'android.permission.SYSTEM_ALERT_WINDOW'],
     permissions: [
       'android.permission.ACCESS_COARSE_LOCATION',
       'android.permission.ACCESS_FINE_LOCATION',
@@ -87,6 +89,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         cameraPermission:
           'The camera is used to scan pickup QR codes, capture delivery photo proof and upload KYC documents.',
+        recordAudioAndroid: false,
       },
     ],
     'expo-secure-store',

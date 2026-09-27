@@ -20,6 +20,29 @@ npm run lint              # expo lint
 npx expo export --platform android   # native Hermes bundle for the Android app (not viewable in a browser)
 ```
 
+### Build an installable APK
+
+The demo APK runs fully offline on the built-in demo data (`DATA_MODE=local_demo`) and keeps the DEV · SCENARIOS switcher; `APP_ENV=production` builds never show it.
+
+**EAS cloud build** (no Android SDK needed; free Expo account):
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest build --platform android --profile preview   # eas.json → buildType "apk"
+```
+
+EAS prints a download link and QR code for the `.apk` when the build finishes.
+
+**Local build** (Android Studio with SDK 36 + NDK 27.1, JDK 17, `ANDROID_HOME` set):
+
+```bash
+npx expo prebuild --platform android --clean     # generates android/ from app.config.ts (not committed)
+cd android && ./gradlew assembleRelease
+# → android/app/build/outputs/apk/release/app-release.apk (signed with the debug key, for sideloading)
+```
+
+`npx expo run:android --variant release` builds the same APK and installs it on a connected phone or emulator.
+
 ### Preview a static build in a browser
 
 `npx expo export --platform android` writes the **native** JS bundle (`dist/_expo/…/entry-….hbc`) that the Android app loads — serving that folder with a web server only lists `_expo/`, `assets/` and `metadata.json`. For a browser preview export the **web** target, then serve it with a single-page fallback:

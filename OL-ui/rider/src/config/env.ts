@@ -50,8 +50,11 @@ export const isLocalDemo = env.DATA_MODE === 'local_demo' || env.PROVIYAA_API_BA
 export const hasApiBase = env.PROVIYAA_API_BASE_URL.trim().length > 0;
 /** True when Supabase auth can be used (URL + publishable key present). */
 export const hasSupabase = env.SUPABASE_URL.length > 0 && env.SUPABASE_PUBLISHABLE_KEY.length > 0;
-/** Development-only controls (scenario switcher, debug panels). Never true in production builds. */
-export const isDevBuild = __DEV__ && env.APP_ENV !== 'production';
+/**
+ * Development controls (scenario switcher, debug panels): dev bundles and local-demo
+ * release builds (the demo APK) only. Never true when APP_ENV=production.
+ */
+export const isDevBuild = env.APP_ENV !== 'production' && (__DEV__ || isLocalDemo);
 
 export const appMeta = {
   appHeader: 'onlatur-rider',
