@@ -17,8 +17,19 @@ npx expo start --ios
 npm run typecheck         # tsc --noEmit
 npm test                  # jest (state machine, dispatch, geofence, earnings, privacy, queue, demo provider)
 npm run lint              # expo lint
-npx expo export --platform android   # production bundle check
+npx expo export --platform android   # native Hermes bundle for the Android app (not viewable in a browser)
 ```
+
+### Preview a static build in a browser
+
+`npx expo export --platform android` writes the **native** JS bundle (`dist/_expo/…/entry-….hbc`) that the Android app loads — serving that folder with a web server only lists `_expo/`, `assets/` and `metadata.json`. For a browser preview export the **web** target, then serve it with a single-page fallback:
+
+```bash
+npm run export:web        # expo export --platform web  → dist/index.html + dist/_expo/static/…
+npm run serve:web         # npx serve dist --single --listen 3000  → http://localhost:3000
+```
+
+`npx expo start --web` gives the same app with live reload; a phone with Expo Go (`npx expo start`, scan the QR) runs it natively.
 
 Builds (EAS): `npx eas-cli@latest build --platform android --profile preview` / `--platform ios --profile preview` (see `eas.json`).
 The Android foreground-service location and push notifications need a development build (`npx expo run:android`); Expo Go covers every screen and flow with foreground GPS.

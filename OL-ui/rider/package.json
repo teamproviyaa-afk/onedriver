@@ -14,6 +14,8 @@
     "test:watch": "jest --watch",
     "doctor": "expo-doctor",
     "export:android": "expo export --platform android",
+    "export:web": "expo export --platform web",
+    "serve:web": "npx serve dist --single --listen 3000",
     "build:android": "eas build --platform android --profile preview",
     "build:ios": "eas build --platform ios --profile preview"
   },
