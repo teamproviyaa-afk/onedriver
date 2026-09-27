@@ -92,6 +92,8 @@ const daysAgo = (n: number, h = 10, m = 0) => {
   d.setHours(h, m, 0, 0);
   return d;
 };
+/** Today's entries are relative to now so they never sort into the future early in the day. */
+const minutesAgo = (m: number) => new Date(now().getTime() - m * 60000);
 
 export const makeDemoRider = (over: Partial<Rider> = {}): Rider => ({
   id: 'rider-1001',
@@ -254,10 +256,10 @@ export const makeHistory = (): { job: Job; earnings?: JobEarnings }[] => {
   };
   // Today: 4 delivered = ₹780 (sample amounts)
   const today = [
-    mk('job-9818', '#9818', 'Express MegaMart', 'Shivaji Nagar', 5.5, daysAgo(0, 8, 40), 210, { category: 'quick_drop' }, { base: 45, distance: 33, peak: 15, tip: 20, bonus: 97, total: 210 }),
-    mk('job-9815', '#9815', 'Gourmet Kitchen', 'Nanded Road', 4.1, daysAgo(0, 9, 55), 195, {}, { base: 45, distance: 24.6, peak: 15, tip: 10, bonus: 100.4, total: 195 }),
-    mk('job-9812', '#9812', 'Express MegaMart', 'Ausa Road', 3.8, daysAgo(0, 11, 20), 185, { category: 'quick_drop', cashToCollect: 320 }, { base: 45, distance: 22.8, peak: 15, tip: 0, bonus: 102.2, total: 185 }),
-    mk('job-9807', '#9807', 'Sai Courier Point', 'MIDC Latur', 6.2, daysAgo(0, 12, 30), 190, { category: 'pick_drop', proofMethods: ['signature'] }, { base: 45, distance: 37.2, peak: 15, tip: 0, bonus: 92.8, total: 190 }),
+    mk('job-9818', '#9818', 'Express MegaMart', 'Shivaji Nagar', 5.5, minutesAgo(265), 210, { category: 'quick_drop' }, { base: 45, distance: 33, peak: 15, tip: 20, bonus: 97, total: 210 }),
+    mk('job-9815', '#9815', 'Gourmet Kitchen', 'Nanded Road', 4.1, minutesAgo(190), 195, {}, { base: 45, distance: 24.6, peak: 15, tip: 10, bonus: 100.4, total: 195 }),
+    mk('job-9812', '#9812', 'Express MegaMart', 'Ausa Road', 3.8, minutesAgo(105), 185, { category: 'quick_drop', cashToCollect: 320 }, { base: 45, distance: 22.8, peak: 15, tip: 0, bonus: 102.2, total: 185 }),
+    mk('job-9807', '#9807', 'Sai Courier Point', 'MIDC Latur', 6.2, minutesAgo(45), 190, { category: 'pick_drop', proofMethods: ['signature'] }, { base: 45, distance: 37.2, peak: 15, tip: 0, bonus: 92.8, total: 190 }),
   ];
   const yesterday = [
     mk('job-9790', '#9790', 'Express MegaMart', 'Shanti Enclave', 4.0, daysAgo(1, 9, 10), 220, {}, { base: 45, distance: 24, peak: 0, tip: 25, bonus: 126, total: 220 }),
@@ -269,7 +271,7 @@ export const makeHistory = (): { job: Job; earnings?: JobEarnings }[] => {
 };
 
 export const makeNotifications = (): RiderNotification[] => [
-  { id: 'n-1', kind: 'incentive', title: 'Peak incentive active', body: 'Earn ₹50 extra on every order between 7–10 PM today.', createdAt: iso(daysAgo(0, 7, 30)), readAt: null, deepLink: '/earnings' },
+  { id: 'n-1', kind: 'incentive', title: 'Peak incentive active', body: 'Earn ₹50 extra on every order between 7–10 PM today.', createdAt: iso(minutesAgo(320)), readAt: null, deepLink: '/earnings' },
   { id: 'n-2', kind: 'payment_disbursed', title: 'Weekly payout sent', body: '₹3,120 was transferred to rahul.sharma@ybl.', createdAt: iso(daysAgo(1, 9, 0)), readAt: iso(daysAgo(1, 9, 30)), deepLink: '/earnings/week' },
   { id: 'n-3', kind: 'document_expiry', title: 'Driving licence check', body: 'Your DL is valid until 14 Mar 2029. No action needed.', createdAt: iso(daysAgo(2, 10, 0)), readAt: iso(daysAgo(2, 12, 0)), deepLink: '/profile' },
   { id: 'n-4', kind: 'tier_upgrade', title: "You're now a VIP rider", body: 'Priority dispatch and 1.2x payout on linked store orders.', createdAt: iso(daysAgo(3, 15, 0)), readAt: iso(daysAgo(3, 15, 5)), deepLink: '/profile' },
@@ -277,7 +279,7 @@ export const makeNotifications = (): RiderNotification[] => [
 ];
 
 export const makeLedger = (): CashLedgerEntry[] => [
-  { id: 'l-1', jobId: 'job-9812', kind: 'collected', amount: 320, createdAt: iso(daysAgo(0, 11, 50)), note: 'COD #9812' },
+  { id: 'l-1', jobId: 'job-9812', kind: 'collected', amount: 320, createdAt: iso(minutesAgo(70)), note: 'COD #9812' },
   { id: 'l-2', kind: 'deposited', amount: 1500, createdAt: iso(daysAgo(1, 21, 0)), note: 'Deposited at Store A' },
   { id: 'l-3', jobId: 'job-9781', kind: 'collected', amount: 640, createdAt: iso(daysAgo(1, 18, 50)), note: 'COD #9781' },
   { id: 'l-4', jobId: 'job-9790', kind: 'collected', amount: 860, createdAt: iso(daysAgo(1, 9, 40)), note: 'COD #9790' },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, ScrollView, StyleSheet, View, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -40,6 +40,7 @@ const windowSeconds = (offer: Offer): number => {
 };
 
 const haptic = async () => {
+  if (Platform.OS === 'web') return; // browsers block vibration before the first tap
   try {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   } catch {

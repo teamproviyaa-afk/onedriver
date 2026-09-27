@@ -58,7 +58,7 @@ export default function TasksScreen() {
               {section.title}
             </AppText>
           )}
-          renderSectionFooter={SectionGap}
+          renderSectionFooter={() => <SectionGap />}
           ItemSeparatorComponent={RowGap}
           stickySectionHeadersEnabled={false}
           contentContainerStyle={[styles.list, sections.length === 0 && styles.listEmpty]}

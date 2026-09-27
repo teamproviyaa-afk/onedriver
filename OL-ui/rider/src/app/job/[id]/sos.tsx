@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +20,7 @@ const TITLE = 'Safety Assistance';
 const HOLD_MS = 3000;
 
 const haptic = async (kind: 'start' | 'sent' | 'cancel') => {
+  if (Platform.OS === 'web') return; // browsers block vibration before the first tap
   try {
     if (kind === 'start') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else if (kind === 'sent') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);

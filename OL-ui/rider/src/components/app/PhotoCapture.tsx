@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { colors, radius, shadows, spacing } from '@/theme';
@@ -50,7 +51,8 @@ export const PhotoCapture = ({ value, onChange, height = 280, captureRef, placeh
       if (value) return;
       if (!canUseCamera || !cam.current || !ready) {
         // No camera (web / denied): use the reference placeholder so the flow can continue in demo.
-        if (placeholder) onChange(Image.resolveAssetSource(placeholder).uri);
+        // Asset.fromModule works on native and web (RN-web's Image has no resolveAssetSource).
+        if (placeholder) onChange(Asset.fromModule(placeholder).uri);
         return;
       }
       try {

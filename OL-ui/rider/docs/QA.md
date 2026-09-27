@@ -30,3 +30,14 @@ Static checks: `npm run typecheck` (tsc strict), `npm run lint` (eslint-config-e
 5. Earnings tab (today), View weekly, tap a job → breakdown; Tasks tab (today/yesterday) → task detail timeline; Alerts; Profile.
 6. DEV chip → scenarios: Auto Accept, Order Not Ready, Mismatch, Incomplete, Vehicle Breakdown, Customer Unavailable, Wrong Address, Customer Refused, OTP Failed, Photo Proof, Signature Proof, Offline Job (toggle "Simulate network loss" mid-job, take steps, toggle back → SYNCING → synced), Version Conflict, Cash Limit (/cash → record deposit), Suspended Rider, Out-of-zone.
 7. Kill the app mid-job → relaunch → resumes on the correct job screen.
+
+## Headless web run (npx expo start --web + Playwright/Chromium, 390×844)
+
+Driven end to end in a fresh browser profile with `DATA_MODE=local_demo`; every step captured and reviewed against the Figma frames.
+
+| Journey | Steps | Result |
+|---|---|---|
+| Returning rider, OTP proof | intro → skip permissions → sign in `9876543210` → OTP `123456` → home → GO ONLINE → offer #9830 → accept → current job → START NAVIGATION (new tab) → demo GPS to store → ARRIVED AT STORE → checklist → VERIFY PICKUP → code `OL-9830` → Pickup confirmed → PROCEED TO DELIVERY → START NAVIGATION → ON THE WAY → 100 m geofence auto-prompt "You have arrived?" → Yes → START DELIVERY VERIFICATION → Secure OTP → `4821` → VERIFY & COMPLETE → Delivered ₹135.30 → BACK TO HOME (₹915.30, 5 jobs) → Tasks → task #9830 detail → Earnings → Week → Alerts → Profile → Cash → Dev scenarios | 27/27 steps, 0 console errors |
+| Photo proof | same journey up to the method sheet → Photo Proof (preselected for the contactless drop) → CONFIRM METHOD → CAPTURE (reference image on web) → SUBMIT PHOTO → Delivered → home | see `scratchpad` run log |
+
+Defects found and fixed by this run: Tasks tab crashed with "Invalid hook call" (`renderSectionFooter` was given a compiled component instead of a render function); photo proof on web threw `Image.resolveAssetSource is not a function` (now `expo-asset`); today's demo history used fixed clock times that sorted into the future early in the day (now relative to now); expo-haptics vibrate warning on web (haptics skipped on web).
