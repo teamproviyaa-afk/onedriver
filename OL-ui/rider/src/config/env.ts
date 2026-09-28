@@ -51,6 +51,12 @@ export const hasApiBase = env.PROVIYAA_API_BASE_URL.trim().length > 0;
 /** True when Supabase auth can be used (URL + publishable key present). */
 export const hasSupabase = env.SUPABASE_URL.length > 0 && env.SUPABASE_PUBLISHABLE_KEY.length > 0;
 /**
+ * Real phone sign-in: Supabase Auth, with the code delivered on WhatsApp or SMS by the `notify`
+ * Edge Function (Send-SMS hook). DATA_MODE=supabase keeps the local demo data for everything else;
+ * DATA_MODE=api also uses the One Local server. DATA_MODE=local_demo signs in with code 123456.
+ */
+export const isLiveAuth = hasSupabase && env.DATA_MODE !== 'local_demo';
+/**
  * Development controls (scenario switcher, debug panels): dev bundles and local-demo
  * release builds (the demo APK) only. Never true when APP_ENV=production.
  */

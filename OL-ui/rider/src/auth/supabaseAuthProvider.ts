@@ -28,13 +28,16 @@ export class SupabaseAuthProvider implements AuthProvider {
     const { error } = await this.client.auth.signInWithOtp({ phone: toE164(phone) });
     if (error) {
       const limited = error.status === 429 || /rate limit|too many/i.test(error.message);
-      throw new ApiError({ code: limited ? 'rate_limited' : 'unknown', detail: limited ? 'Too many codes requested. Wait a few minutes and try again.' : error.message, status: error.status });
+      if (limited) throw new ApiError({ code: 'rate_limited', detail: 'Too many codes requested. Wait a few minutes and try again.', status: 429 });
+      if (isNetworkError(error)) throw new ApiError({ code: 'network', detail: "Couldn't reach the server. Check your internet connection and try again." });
+      throw new ApiError({ code: 'unknown', detail: error.message, status: error.status });
     }
     return { phone, expiresInSeconds: 300, resendAfterSeconds: OTP.resendSeconds, delivery: { channel: 'unknown' } };
   }
 
   async verifyOtp(phone: string, code: string): Promise<AuthSession> {
     const { data, error } = await this.client.auth.verifyOtp({ phone: toE164(phone), token: code, type: 'sms' });
+    if (error && isNetworkError(error)) throw new ApiError({ code: 'network', detail: "Couldn't reach the server. Check your internet connection and try again." });
     if (error || !data.session) throw new ApiError({ code: 'otp_invalid', detail: error?.message ?? 'Invalid OTP' });
     const s = data.session;
     return { userId: s.user.id, phone, accessToken: s.access_token, refreshToken: s.refresh_token, isNewUser: !!data.user && data.user.created_at === data.user.last_sign_in_at };
@@ -56,3 +59,7 @@ export const toE164 = (phone: string): string => {
   if (digits.startsWith('91') && digits.length === 12) return `+${digits}`;
   return phone.startsWith('+') ? phone : `+${digits}`;
 };
+
+/** supabase-js reports a failed request (offline, blocked) as AuthRetryableFetchError / "Failed to fetch". */
+const isNetworkError = (error: { name?: string; message: string; status?: number }): boolean =>
+  error.name === 'AuthRetryableFetchError' || error.status === 0 || /failed to fetch|network request failed|load failed/i.test(error.message);

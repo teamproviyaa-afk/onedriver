@@ -10,7 +10,7 @@ import { useAuthActions } from '@/hooks/useAuthActions';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { OTP } from '@/domain/otp';
-import { isLocalDemo } from '@/config/env';
+import { isLiveAuth } from '@/config/env';
 import { DEMO_OTP_CODE } from '@/demo/constants';
 import { formatCountdown } from '@/utils/format';
 import { addSeconds, nowIso } from '@/utils/time';
@@ -171,7 +171,7 @@ export default function OtpScreen() {
           {error}
         </AppText>
       ) : null}
-      {isLocalDemo ? (
+      {!isLiveAuth ? (
         <AppText variant="bodySm" color="textMuted" align="center" style={styles.hint}>
           Demo code: {DEMO_OTP_CODE}
         </AppText>

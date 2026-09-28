@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import { AppText, PrimaryButton, Screen } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import { useAuthActions } from '@/hooks/useAuthActions';
-import { isLocalDemo } from '@/config/env';
+import { isLiveAuth } from '@/config/env';
 import { DEMO_RETURNING_PHONE } from '@/demo/constants';
 import { PhoneField } from '@/features/auth/FormFields';
 import { PHONE_ERROR, isValidIndianMobile, normalizePhone } from '@/features/auth/phone';
@@ -80,7 +80,7 @@ export default function SignInScreen() {
               editable={!busy}
               error={localError ?? error}
               helper={
-                isLocalDemo ? (
+                !isLiveAuth ? (
                   <AppText variant="bodySm" color={colors.darkAction} style={styles.hint}>
                     Demo: use {DEMO_RETURNING_PHONE} for the sample rider
                   </AppText>

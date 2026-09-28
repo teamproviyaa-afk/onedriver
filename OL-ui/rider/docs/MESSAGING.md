@@ -5,6 +5,27 @@ Every WhatsApp, SMS and email is sent **by the server**, from the Supabase Edge 
 Supabase secrets. The rider app never holds them and never sends a message itself: it asks the
 One Local server, which checks the request and calls `notify`.
 
+## Go live in 4 steps (real WhatsApp and SMS)
+
+1. **Accounts.** WhatsApp works the same day with a Meta developer app: *WhatsApp → API Setup* gives a
+   test number, its phone-number ID and a temporary token; add your own phone as a recipient and create
+   the Authentication template `onelocal_login_otp` (approval is usually quick). SMS to Indian numbers
+   needs DLT registration (sender ID + templates) through MSG91, which takes a few days; start it now.
+   Email: verify a sending domain in Resend.
+2. **Keys.** `cp supabase/.env.notify.example supabase/.env.notify` and fill in the provider keys
+   (this file is git-ignored; never commit it). Create a Supabase personal access token and
+   `export SUPABASE_ACCESS_TOKEN=sbp_…`.
+3. **Deploy.** `bash supabase/setup-messaging.sh` — links the project, applies the migrations,
+   uploads the secrets, deploys `notify`, starts the 15 s SMS fallback timer, points Supabase
+   sign-in codes at the function and prints the Meta webhook URL + verify token.
+4. **Test.** `bash supabase/setup-messaging.sh test <your phone>` (add `sms` or `whatsapp` to test
+   one channel). Then run the app with real sign-in codes: `npm run start:live` in `OL-ui/rider`, or
+   build it with `npx eas-cli@latest build -p android --profile preview-live`.
+
+In live mode (`DATA_MODE=supabase`) sign-in is real — the code arrives on WhatsApp, or by SMS when the
+number is not on WhatsApp — while orders, earnings and the other messages stay on demo data until
+the One Local server is connected (`DATA_MODE=api` + `PROVIYAA_API_BASE_URL`).
+
 ## When a message goes by SMS instead of WhatsApp
 
 Phone messages try WhatsApp first. SMS is sent when:
@@ -45,7 +66,7 @@ Limits: 5 codes per number per 15 minutes; a resend needs 30 s between sends.
   publishable key cannot read them.
 * The rider app never receives a customer's number, not even masked; it only sees the channel.
 
-## Setup (production)
+## Setup in detail (what the script does)
 
 ### 1. Provider accounts
 

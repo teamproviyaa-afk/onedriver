@@ -5,12 +5,13 @@
  *      → LocalDemoProvider | OneLocalApiProvider (+ SupabaseAuthProvider)
  *
  * The provider is chosen once from the environment:
- *   DATA_MODE=local_demo or empty PROVIYAA_API_BASE_URL → LocalDemoProvider + DemoAuthProvider
- *   otherwise                                           → OneLocalApiProvider + SupabaseAuthProvider
+ *   Data: DATA_MODE=local_demo or empty PROVIYAA_API_BASE_URL → LocalDemoProvider, otherwise OneLocalApiProvider
+ *   Auth: DATA_MODE=supabase or api (with Supabase configured)  → SupabaseAuthProvider (real WhatsApp/SMS codes),
+ *         otherwise                                             → DemoAuthProvider (code 123456)
  */
 import { DemoAuthProvider } from '@/auth/demoAuthProvider';
 import { SupabaseAuthProvider } from '@/auth/supabaseAuthProvider';
-import { env, hasApiBase, hasSupabase, isLocalDemo } from '@/config/env';
+import { env, hasApiBase, isLiveAuth, isLocalDemo } from '@/config/env';
 import { LocalDemoProvider } from './localDemoProvider';
 import { OneLocalApiProvider } from './oneLocalApiProvider';
 import type { AuthProvider, RiderDataProvider } from './types';
@@ -21,7 +22,7 @@ let demoProvider: LocalDemoProvider | null = null;
 
 export const getAuthProvider = (): AuthProvider => {
   if (!authProvider) {
-    authProvider = isLocalDemo || !hasSupabase ? new DemoAuthProvider() : new SupabaseAuthProvider();
+    authProvider = isLiveAuth ? new SupabaseAuthProvider() : new DemoAuthProvider();
   }
   return authProvider;
 };

@@ -121,6 +121,9 @@ sent by the server-side `notify` Edge Function in [`supabase/`](../../supabase):
 the number is not on WhatsApp (or WhatsApp fails, times out, or the code is requested again), email
 alongside. The app only shows the channel used. Setup and provider accounts: [docs/MESSAGING.md](docs/MESSAGING.md).
 
+Real sign-in codes on your phone: deploy with `bash supabase/setup-messaging.sh`, then `npm run start:live`
+(or the `preview-live` EAS profile). `DATA_MODE=supabase` uses real Supabase phone auth with demo data.
+
 ## Security & privacy
 
 * Only the Supabase **publishable** key ships in the app. No service-role, admin, payout or server secrets.

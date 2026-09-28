@@ -29,6 +29,14 @@
         "simulator": true
       }
     },
+    "preview-live": {
+      "extends": "preview",
+      "env": {
+        "APP_ENV": "local",
+        "DATA_MODE": "supabase",
+        "EXPO_PUBLIC_DATA_MODE": "supabase"
+      }
+    },
     "production": {
       "environment": "production",
       "env": {

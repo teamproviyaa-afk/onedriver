@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "start": "expo start",
+    "start:live": "DATA_MODE=supabase EXPO_PUBLIC_DATA_MODE=supabase expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

@@ -3,3 +3,9 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Supabase: local secrets and CLI state
+supabase/.env.notify
+supabase/.env.notify.bak
+supabase/.temp/
+supabase/.branches/
