@@ -1,0 +1,7 @@
+# Supabase CLI configuration (Edge Functions for the OneLocal project).
+project_id = "onelocal"
+
+[functions.notify]
+# Every route authenticates itself (shared secret, provider signatures or the Auth hook
+# signature), and provider webhooks cannot send a Supabase JWT.
+verify_jwt = false
