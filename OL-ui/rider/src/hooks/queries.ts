@@ -7,6 +7,7 @@ import { useEarningsStore } from '@/stores/useEarningsStore';
 import { useRiderStore } from '@/stores/useRiderStore';
 import { useConnectivityStore, selectEffectiveOnline } from '@/stores/useConnectivityStore';
 import { isTerminal } from '@/state-machine/deliveryStateMachine';
+import { isTerminalPayout } from '@/domain/payouts';
 import { queryKeys } from './queryClient';
 
 const provider = () => getDataProvider();
@@ -93,6 +94,27 @@ export const useJobEarnings = (id: string | undefined) =>
 export const useJobHistory = () => useQuery({ queryKey: queryKeys.history, queryFn: () => provider().listJobs(), staleTime: 15_000 });
 
 export const useCash = () => useQuery({ queryKey: queryKeys.cash, queryFn: () => provider().getCash(), staleTime: 5_000 });
+
+/** GET /rider/wallet — refreshes while a withdrawal is in flight so the balance follows it. */
+export const useWallet = () =>
+  useQuery({
+    queryKey: queryKeys.wallet,
+    queryFn: () => provider().getWallet(),
+    staleTime: 5_000,
+    refetchInterval: (q) => ((q.state.data?.inFlight ?? 0) > 0 ? 4_000 : false),
+  });
+
+export const usePayoutHistory = () => useQuery({ queryKey: queryKeys.payouts, queryFn: () => provider().listPayouts(), staleTime: 10_000 });
+
+/** One transfer, polled until the bank answers (success / failed / reversed). */
+export const usePayout = (id: string | undefined) =>
+  useQuery({
+    queryKey: queryKeys.payout(id ?? ''),
+    queryFn: () => provider().getPayout(id!),
+    enabled: !!id,
+    staleTime: 0,
+    refetchInterval: (q) => (q.state.data && isTerminalPayout(q.state.data.status) ? false : 2_500),
+  });
 
 export const useNotifications = () =>
   useQuery({ queryKey: queryKeys.notifications, queryFn: () => provider().listNotifications(), staleTime: 5_000, refetchInterval: 15_000 });

@@ -45,7 +45,7 @@ export interface SosResult {
 /** DATA_MODE=local_demo only: what the simulated server "sent", shown on the dev screen. */
 export interface DemoOutboxMessage {
   id: string;
-  template: 'login_otp' | 'delivery_otp' | 'order_delivered' | 'rider_approved' | 'weekly_statement' | 'sos_alert';
+  template: 'login_otp' | 'delivery_otp' | 'order_delivered' | 'rider_approved' | 'payout_sent' | 'weekly_statement' | 'sos_alert';
   audience: MessageAudience;
   channel: MessageChannel;
   fallbackUsed: boolean;

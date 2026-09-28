@@ -9,7 +9,7 @@ import { colors, fontFamily, spacing } from '@/theme';
 import { formatINR } from '@/utils/format';
 
 type Tab = 'earnings' | 'trips' | 'rewards';
-type Sheet = 'withdraw' | 'rewards' | null;
+type Sheet = 'rewards' | null;
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'earnings', label: 'EARNINGS' },
@@ -19,7 +19,7 @@ const TABS: { value: Tab; label: string }[] = [
 
 const inr = (n: number) => formatINR(n, { decimals: 2 });
 
-/** Figma earnings-today: today's payout hero, deliveries / avg per trip, quick payout split, WITHDRAW EARNINGS (coming soon). */
+/** Figma earnings-today: today's payout hero, deliveries / avg per trip, quick payout split, WITHDRAW EARNINGS (→ /earnings/withdraw). */
 export default function EarningsScreen() {
   const { data, isLoading, error, refetch, isRefetching } = useEarnings('today');
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -39,7 +39,7 @@ export default function EarningsScreen() {
     : [];
 
   return (
-    <Screen padded={false} footer={<PrimaryButton label="WITHDRAW EARNINGS" onPress={() => setSheet('withdraw')} disabled={!data} />} footerStyle={styles.footer}>
+    <Screen padded={false} footer={<PrimaryButton label="WITHDRAW EARNINGS" onPress={() => router.push('/earnings/withdraw' as never)} />} footerStyle={styles.footer}>
       <View style={styles.tabs}>
         <PillTabs options={TABS} value="earnings" onChange={onTab} />
       </View>
@@ -110,14 +110,6 @@ export default function EarningsScreen() {
         </ScrollView>
       ) : null}
 
-      <ConfirmationSheet
-        visible={sheet === 'withdraw'}
-        onClose={() => setSheet(null)}
-        icon="wallet"
-        title="Withdraw earnings"
-        body="Coming soon. Payouts are sent weekly (Monday) to your verified UPI/bank account."
-        cancelLabel="GOT IT"
-      />
       <ConfirmationSheet
         visible={sheet === 'rewards'}
         onClose={() => setSheet(null)}

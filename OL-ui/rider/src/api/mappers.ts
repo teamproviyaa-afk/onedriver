@@ -9,6 +9,8 @@ import type {
   JobEarnings,
   JobState,
   Offer,
+  PayoutMethod,
+  PayoutTransfer,
   PlaceSource,
   ProofMethod,
   Rider,
@@ -16,8 +18,9 @@ import type {
   RiderMe,
   RiderNotification,
   StoreLink,
+  WalletSummary,
 } from '@/types';
-import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, RiderDto } from './dto';
+import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, RiderDto, WalletDto } from './dto';
 
 const asCategory = (c: string): DeliveryCategory =>
   c === 'quick_drop' || c === 'pick_drop' ? c : 'on_order';
@@ -232,4 +235,56 @@ export const mapMessageReceipt = (d: MessageReceiptDto): MessageReceipt => ({
   toMasked: d.to_masked,
   sentAt: d.sent_at,
   resendAfterSeconds: d.resend_after_seconds,
+});
+
+export const mapPayoutMethod = (d: PayoutMethodDto): PayoutMethod => ({
+  id: d.id ?? `payout-${d.method}`,
+  method: d.method,
+  holderName: d.holder_name,
+  accountLast4: d.account_last4,
+  ifsc: d.ifsc,
+  vpa: d.vpa,
+  bankName: d.bank_name,
+  verifiedName: d.verified_name,
+  nameMatch: d.name_match,
+  verifiedAt: d.verified_at,
+  status: d.status,
+  isPrimary: d.is_primary ?? true,
+  provider: d.provider,
+});
+
+export const mapPayoutTransfer = (d: PayoutTransferDto): PayoutTransfer => {
+  const fee = d.fee ?? 0;
+  return {
+    id: d.id,
+    kind: d.kind,
+    mode: d.mode,
+    amount: d.amount,
+    fee,
+    net: d.net ?? Math.round((d.amount - fee) * 100) / 100,
+    status: d.status,
+    utr: d.utr ?? undefined,
+    statusDescription: d.status_description ?? undefined,
+    destination: d.destination,
+    periodLabel: d.period_label ?? undefined,
+    createdAt: d.created_at,
+    completedAt: d.completed_at ?? undefined,
+  };
+};
+
+export const mapWallet = (d: WalletDto): WalletSummary => ({
+  balance: d.balance,
+  available: d.available,
+  inFlight: d.in_flight,
+  instant: {
+    enabled: d.instant.enabled,
+    minAmount: d.instant.min_amount,
+    maxAmount: d.instant.max_amount,
+    fee: d.instant.fee,
+    withdrawalsLeftToday: d.instant.withdrawals_left_today,
+    blockedReason: d.instant.blocked_reason ?? undefined,
+  },
+  weekly: { nextPayoutAt: d.weekly.next_payout_at, description: d.weekly.description },
+  payoutMethod: d.payout_method ? mapPayoutMethod(d.payout_method) : null,
+  recent: d.recent.map(mapPayoutTransfer),
 });

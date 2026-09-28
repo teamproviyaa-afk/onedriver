@@ -27,13 +27,15 @@ export interface StepHeaderProps {
   onBack?: () => void;
   /** Where the back button lands when there is no history (deep link / reload). */
   backFallback?: string;
+  /** Editing outside onboarding (e.g. from Profile) — no "STEP x OF y" pill. */
+  hideStep?: boolean;
 }
 
 /**
  * Onboarding step chrome from the Figma store-/solo- screens: white squircle back
  * button · "STEP 1 OF 5" pill · HELP pill, then the 28px title + secondary subtitle.
  */
-export const StepHeader = ({ step, total, title, subtitle, titleVariant = 'display', onBack, backFallback = '/onboarding/type' }: StepHeaderProps) => {
+export const StepHeader = ({ step, total, title, subtitle, titleVariant = 'display', onBack, backFallback = '/onboarding/type', hideStep }: StepHeaderProps) => {
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(backFallback as never)));
   return (
     <View style={styles.header}>
@@ -41,11 +43,15 @@ export const StepHeader = ({ step, total, title, subtitle, titleVariant = 'displ
         <Pressable accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8} onPress={back} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
           <Icon name="chevron-left" size={16} strokeWidth={2.5} />
         </Pressable>
-        <View style={styles.pill} accessibilityRole="text" accessibilityLabel={`Step ${step} of ${total}`}>
-          <AppText variant="label" uppercase>
-            {`STEP ${step} OF ${total}`}
-          </AppText>
-        </View>
+        {hideStep ? (
+          <View />
+        ) : (
+          <View style={styles.pill} accessibilityRole="text" accessibilityLabel={`Step ${step} of ${total}`}>
+            <AppText variant="label" uppercase>
+              {`STEP ${step} OF ${total}`}
+            </AppText>
+          </View>
+        )}
         <Pressable accessibilityRole="button" accessibilityLabel="Help and support" hitSlop={8} onPress={() => router.push('/support' as never)} style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
           <AppText variant="label" uppercase>
             HELP

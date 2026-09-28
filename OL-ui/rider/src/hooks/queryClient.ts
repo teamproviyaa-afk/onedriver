@@ -29,5 +29,8 @@ export const queryKeys = {
   jobEarnings: (id: string) => ['earnings', 'job', id] as const,
   history: ['jobs', 'history'] as const,
   cash: ['cash'] as const,
+  wallet: ['wallet'] as const,
+  payouts: ['payouts'] as const,
+  payout: (id: string) => ['payouts', id] as const,
   notifications: ['notifications'] as const,
 };

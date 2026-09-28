@@ -15,7 +15,7 @@ Headers on every call: `authorization: Bearer <supabase access token>`, `x-app: 
 | `POST /rider/kyc/documents` | `submitDocument` | /onboarding/kyc, /onboarding/vehicle (RC) |
 | `PUT /rider/vehicle` | `setVehicle` | /onboarding/vehicle |
 | `PUT /rider/preferences` | `setPreferences` | /onboarding/categories → stores → acceptance |
-| `PUT /rider/payout` | `setPayout` | /onboarding/payout/bank, /onboarding/payout/upi |
+| `PUT /rider/payout` → `{ verified_name, name_match, … }` | `setPayout` | /onboarding/payout/bank, /onboarding/payout/upi (also `?mode=manage` from Profile / Withdraw; 422 `account_invalid` / `name_mismatch`) |
 | `POST /rider/submit` | `submitApplication` | /onboarding/priority (store) · /onboarding/payout/* (solo) |
 | `GET /rider/status` | `getStatus` | /status (polled) |
 | `POST /rider/uploads` | `createUpload` | KYC, RC, proof photo, signature |
@@ -42,6 +42,9 @@ Headers on every call: `authorization: Bearer <supabase access token>`, `x-app: 
 | `GET /rider/statements/:week.pdf` | `getStatementUrl` | /earnings/week |
 | `POST /rider/statements/:week/email` | `emailStatement` | /earnings/week "Email me this statement" (400 `validation` without an email) |
 | `GET /rider/cash` | `getCash` | /cash |
+| `GET /rider/wallet` | `getWallet` | /earnings/withdraw, Profile (payout method) |
+| `POST /rider/payouts/withdraw` `{ amount }` + `Idempotency-Key` | `requestWithdrawal` | /earnings/withdraw (422 `validation` / `insufficient_balance` / `payout_blocked`, 409 `no_payout_account`, 429 `rate_limited`) |
+| `GET /rider/payouts` · `GET /rider/payouts/:id` | `listPayouts` / `getPayout` | /earnings/withdraw (status polled until final) |
 | `GET /rider/notifications` · `POST /rider/notifications/read` | `listNotifications` / `markNotificationsRead` | /alerts |
 
 Addition to the spec's step list: `to: "picked_up"` (spec §5.2 lists the state but omits it from the step body); the
@@ -50,3 +53,7 @@ demo provider and API provider both send it so `pickup_verified → picked_up` i
 Messaging (WhatsApp → SMS fallback, email) is sent by the server through the `notify` Edge Function;
 job responses may carry `otp_delivery` (how the customer received the delivery OTP, no number) and
 `PUT /rider/profile` accepts an optional `email`. See [MESSAGING.md](MESSAGING.md).
+
+Payouts (withdrawals, weekly payouts, UPI / bank verification) go through Cashfree on the server
+(`payouts` Edge Function). The app sends an `Idempotency-Key` per withdrawal and reuses it on retry, so a
+timeout never pays twice. See [PAYOUTS.md](PAYOUTS.md).

@@ -17,6 +17,7 @@
 | Privacy | `privacy.test.ts`, `localDemoProvider.test.ts` | address hidden before pickup_verified, phone unavailable after delivery, other rider's job → 404, PII stripped from caches |
 | Offline | `queueEngine.test.ts` | queue while offline, ordered replay, version conflict dropped (server wins), transient retry + SYNC ERROR state, idempotency keys, recordedAt preserved |
 | Navigation / tracking | `navigation.test.ts` | coordinate-only URLs with platform fallbacks, cadence rules, INR formatting |
+| Payouts | `payouts.test.ts` | amount parsing, withdrawal checks in server order, quick amounts, masking, name match (initials / titles / partial / someone else), next Monday 10:00, API mapping, demo wallet balance since last weekly payout, processing → credited with UTR + payout_sent WhatsApp, same idempotency key never pays twice, min / balance / 3-a-day limits, failed transfer returns the money, cash limit and suspension block withdrawals, UPI / bank verification refusals |
 
 Static checks: `npm run typecheck` (tsc strict), `npm run lint` (eslint-config-expo incl. React Compiler rules), `npx expo export --platform android` (Metro bundle).
 
@@ -61,3 +62,21 @@ made a hidden earlier screen in the stack redirect the rider to the method picke
 redirects now run only on the focused screen and only when the state changes; the dev outbox read
 the demo world before it had loaded and lost the sign-in code when the phone was attached.
 Note: in this sandbox Metro does not pick up file edits — restart it with `--clear` after changes.
+
+## Payouts (Cashfree)
+
+Automated: `supabase/tests/payouts.*.test.ts` (20 node:test tests — Cashfree request formats and
+signatures, webhook signature, idempotent transfer ids, unknown → reconciled, never re-sent, name match,
+status callback, contact data deleted, routes end-to-end against a fake Cashfree API) and
+`src/__tests__/payouts.test.ts` (17 tests, above).
+
+Headless web run (`DATA_MODE=local_demo`), 15/15 steps, 0 console errors:
+sign in `9876543210` → Earnings → *WITHDRAW EARNINGS* → ₹1,420.00 available, weekly payout history,
+"Name verified with the bank" → ₹50 → "The minimum withdrawal is ₹100" (button disabled) → ₹500 chip →
+fee Free, you receive ₹500.00 → confirm sheet "will be sent to UPI ra••••••@ybl" → *CONFIRM* →
+"Withdrawal in progress", "₹500.00 on its way" → "Money sent", UTR, ₹920.00 left → Dev scenario
+*Withdrawal Fails* → ₹300 → "Withdrawal did not go through … back in your balance", still ₹920.00 →
+*Change* → `mismatch@ybl` → "This account is registered to SURESH PATIL" → `rahul.s@oksbi` → verified →
+*Done* → Withdraw shows "UPI · Google Pay · SBI" → Profile shows the new UPI ID → Alerts: "Withdrawal
+credited" and "Withdrawal failed" → Dev scenario *Cash Limit* → "Deposit your cash in hand (₹2,720) first"
+→ Dev → Messages sent lists the payout_sent WhatsApp with the UTR.

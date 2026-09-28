@@ -36,6 +36,7 @@ import type {
   Paginated,
   PayoutInput,
   PayoutMethod,
+  PayoutTransfer,
   PickupVerifyInput,
   PickupVerifyResult,
   ProfileInput,
@@ -55,6 +56,7 @@ import type {
   StoreLink,
   TrackPoint,
   VehicleInput,
+  WalletSummary,
   ZoneLookup,
 } from '@/types';
 import { canRaiseException, exceptionOutcome, isTerminal, transition, TransitionError } from '@/state-machine/deliveryStateMachine';
@@ -65,6 +67,7 @@ import { computeEarnings } from '@/domain/earnings';
 import { MESSAGING, type MessagePolicy, demoHasWhatsApp, maskEmailForDisplay, maskPhoneForDisplay, normalizeEmail, routeMessage } from '@/domain/messaging';
 import { cashLedgerBalance, canGoOnlineWithCash } from '@/domain/cash';
 import { canCallCustomer } from '@/domain/privacy';
+import { DEMO_PAYOUT_RULES, DEMO_PAYOUT_TEST_ACCOUNTS, bankForVpa, holdsBalance, maskPayoutDestination, matchNames, nextWeeklyPayoutAt, roundRupees, withdrawalProblem } from '@/domain/payouts';
 import { OTP } from '@/domain/otp';
 import {
   DEMO_CITY,
@@ -78,8 +81,10 @@ import {
   DEMO_ZONES,
   LATUR_CENTER,
   PUNE_CENTER,
+  makeDemoPayouts,
   makeDemoRider,
   makeHistory,
+  makeLastSettledAt,
   makeLedger,
   makeNotifications,
   makePendingJobs,
@@ -93,6 +98,7 @@ import {
   DEMO_STORAGE_KEY,
   DEMO_STORE_INVITE_CODES,
 } from '@/demo/constants';
+import { formatINR } from '@/utils/format';
 import { newId } from '@/utils/ids';
 import { isSameLocalDay } from '@/utils/time';
 import { log } from '@/utils/logger';
@@ -116,7 +122,8 @@ export type DemoScenarioId =
   | 'cash_limit'
   | 'suspended_rider'
   | 'out_of_zone'
-  | 'customer_no_whatsapp';
+  | 'customer_no_whatsapp'
+  | 'payout_failed';
 
 export interface DemoScenario {
   id: DemoScenarioId;
@@ -143,6 +150,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
   { id: 'suspended_rider', title: 'Suspended Rider', description: 'Account suspended; access restricted.' },
   { id: 'out_of_zone', title: 'Out-of-zone Rider', description: 'Rider is outside every zone; going online is refused.' },
   { id: 'customer_no_whatsapp', title: 'Customer Not on WhatsApp', description: 'Delivery OTP and receipt go to the customer by SMS; see Messages below.' },
+  { id: 'payout_failed', title: 'Withdrawal Fails', description: 'The bank rejects the next withdrawal; the amount returns to the balance.' },
 ];
 
 interface DemoFlags {
@@ -155,6 +163,8 @@ interface DemoFlags {
   statusOverride?: RiderStatus;
   /** The demo customer has no WhatsApp account → SMS fallback. */
   customerNoWhatsApp?: boolean;
+  /** The bank rejects the next withdrawal. */
+  payoutFails?: boolean;
 }
 
 /** Simulated server-side messaging state (mirrors message_log / whatsapp_capability). */
@@ -165,6 +175,13 @@ interface DemoMessagingState {
   sends: Record<string, string[]>;
   /** recipient → known not on WhatsApp. */
   noWhatsApp: Record<string, boolean>;
+}
+
+/** A simulated Cashfree transfer (what the server keeps in `payouts`). */
+interface DemoPayout extends PayoutTransfer {
+  idempotencyKey?: string;
+  /** When the simulated bank answers. */
+  settleAt?: string;
 }
 
 interface StoredAsset {
@@ -211,6 +228,9 @@ interface DemoWorld {
   sos: { at: string; jobId?: string; lat: number; lng: number }[];
   outbox: DemoOutboxMessage[];
   messaging: DemoMessagingState;
+  payouts: DemoPayout[];
+  /** When the last weekly payout ran; earnings delivered after it are unpaid. */
+  settledAt?: string;
 }
 
 type Listener = (event: { type: 'offer' | 'job' | 'notification' | 'status' | 'world' }) => void;
@@ -248,6 +268,7 @@ const freshWorld = (phone: string | null): DemoWorld => ({
   sos: [],
   outbox: [],
   messaging: { lastWhatsApp: {}, sends: {}, noWhatsApp: {} },
+  payouts: [],
 });
 
 /** Seeds the returning demo rider (Rahul Sharma, approved Store Rider). */
@@ -267,6 +288,8 @@ const seedReturningRider = (w: DemoWorld): DemoWorld => {
   }
   world.notifications = makeNotifications();
   world.ledger = makeLedger();
+  world.payouts = makeDemoPayouts();
+  world.settledAt = makeLastSettledAt();
   return world;
 };
 
@@ -287,8 +310,17 @@ export class LocalDemoProvider implements RiderDataProvider {
       const raw = await AsyncStorage.getItem(DEMO_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as DemoWorld;
-        // Worlds saved before messaging existed get the new fields.
-        if (parsed.v === 1) this.world = { ...parsed, outbox: parsed.outbox ?? [], messaging: parsed.messaging ?? { lastWhatsApp: {}, sends: {}, noWhatsApp: {} } };
+        // Worlds saved before messaging / payouts existed get the new fields.
+        if (parsed.v === 1) {
+          const returning = parsed.phone === DEMO_RETURNING_PHONE && !!parsed.rider;
+          this.world = {
+            ...parsed,
+            outbox: parsed.outbox ?? [],
+            messaging: parsed.messaging ?? { lastWhatsApp: {}, sends: {}, noWhatsApp: {} },
+            payouts: parsed.payouts ?? (returning ? makeDemoPayouts() : []),
+            settledAt: parsed.payouts ? parsed.settledAt : returning ? makeLastSettledAt() : undefined,
+          };
+        }
       }
     } catch (e) {
       log.warn('demo world load failed', e);
@@ -415,6 +447,9 @@ export class LocalDemoProvider implements RiderDataProvider {
         break;
       case 'customer_no_whatsapp':
         w.flags.customerNoWhatsApp = true;
+        break;
+      case 'payout_failed':
+        w.flags.payoutFails = true;
         break;
       default:
         break;
@@ -742,19 +777,35 @@ export class LocalDemoProvider implements RiderDataProvider {
     return input;
   }
 
+  /** Simulates the server's Cashfree verification: account must be active and in the rider's own name. */
   async setPayout(input: PayoutInput): Promise<PayoutMethod> {
     await this.ready;
     const r = this.requireRider();
+    const T = DEMO_PAYOUT_TEST_ACCOUNTS;
+    const base = { id: newId('payout'), verifiedAt: iso(), status: 'verified' as const, isPrimary: true, provider: 'demo' as const };
+    let method: PayoutMethod;
+    let nameAtBank: string;
     if (input.method === 'upi') {
-      if (!/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(input.vpa)) throw new ApiError({ code: 'validation', detail: 'Enter a valid UPI ID like name@bank', status: 400 });
-      this.world.payout = { id: newId('payout'), method: 'upi', vpa: input.vpa, verifiedName: r.fullName.toUpperCase(), verifiedAt: iso(), status: 'verified', isPrimary: true };
+      const vpa = input.vpa.trim().toLowerCase();
+      if (!/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(vpa)) throw new ApiError({ code: 'validation', detail: 'Enter a valid UPI ID like name@bank', status: 400 });
+      if (vpa.startsWith(T.invalidVpaPrefix)) throw new ApiError({ code: 'account_invalid', detail: 'This UPI ID is not active. Check it and try again.', status: 422 });
+      nameAtBank = vpa.startsWith(T.mismatchVpaPrefix) ? T.otherPersonName : r.fullName.toUpperCase();
+      method = { ...base, method: 'upi', vpa, bankName: bankForVpa(vpa), verifiedName: nameAtBank };
     } else {
+      const accountNo = input.accountNo.replace(/\D/g, '');
       if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(input.ifsc)) throw new ApiError({ code: 'validation', detail: 'Enter a valid IFSC code', status: 400 });
-      if (input.accountNo.replace(/\D/g, '').length < 9) throw new ApiError({ code: 'validation', detail: 'Enter a valid account number', status: 400 });
-      this.world.payout = { id: newId('payout'), method: 'bank', holderName: input.holder, accountLast4: input.accountNo.slice(-4), ifsc: input.ifsc.toUpperCase(), verifiedName: input.holder.toUpperCase(), verifiedAt: iso(), status: 'verified', isPrimary: true };
+      if (accountNo.length < 9) throw new ApiError({ code: 'validation', detail: 'Enter a valid account number', status: 400 });
+      if (accountNo.endsWith(T.invalidAccountSuffix)) throw new ApiError({ code: 'account_invalid', detail: 'This bank account could not be verified (ACCOUNT_CLOSED)', status: 422 });
+      nameAtBank = accountNo.endsWith(T.mismatchAccountSuffix) ? T.otherPersonName : input.holder.trim().toUpperCase();
+      method = { ...base, method: 'bank', holderName: input.holder.trim(), accountLast4: accountNo.slice(-4), ifsc: input.ifsc.toUpperCase(), bankName: `${input.ifsc.slice(0, 4).toUpperCase()} Bank`, verifiedName: nameAtBank };
     }
+    const nameMatch = matchNames(r.fullName, nameAtBank);
+    if (nameMatch === 'poor') {
+      throw new ApiError({ code: 'name_mismatch', detail: `This account is registered to ${nameAtBank}. Add an account in your own name (${r.fullName}).`, status: 422, meta: { nameAtBank } });
+    }
+    this.world.payout = { ...method, nameMatch };
     this.touch('status');
-    return this.world.payout;
+    return clone(this.world.payout);
   }
 
   async submitApplication(): Promise<StatusInfo> {
@@ -1292,7 +1343,7 @@ export class LocalDemoProvider implements RiderDataProvider {
     return next;
   }
 
-  private messageRider(template: 'rider_approved', summary: string) {
+  private messageRider(template: 'rider_approved' | 'payout_sent', summary: string) {
     const w = this.world;
     const phone = w.phone ?? w.rider?.phone;
     if (phone) {
@@ -1452,6 +1503,125 @@ export class LocalDemoProvider implements RiderDataProvider {
     return this.getCash();
   }
 
+  // ── Wallet & payouts (simulated Cashfree Payouts) ─────────────────
+  /** Resolves transfers whose simulated bank answer is due: credited, or failed back to the balance. */
+  private settlePayouts() {
+    const w = this.world;
+    const now = Date.now();
+    let changed = false;
+    for (const p of w.payouts) {
+      if (p.status !== 'processing' || !p.settleAt || Date.parse(p.settleAt) > now) continue;
+      changed = true;
+      p.completedAt = iso();
+      p.settleAt = undefined;
+      if (w.flags.payoutFails) {
+        w.flags.payoutFails = false;
+        p.status = 'failed';
+        p.statusDescription = 'The beneficiary bank is not responding right now.';
+        this.notify({ kind: 'payment_disbursed', title: 'Withdrawal failed', body: `${formatINR(p.amount)} is back in your balance. ${p.statusDescription}`, deepLink: '/earnings/withdraw' });
+        continue;
+      }
+      p.status = 'success';
+      p.utr = String(4261e8 + Math.floor(Math.random() * 1e8)).padEnd(12, '0').slice(0, 12);
+      this.notify({ kind: 'payment_disbursed', title: 'Withdrawal credited', body: `${formatINR(p.net)} sent to ${p.destination}. UTR ${p.utr}.`, deepLink: '/earnings/withdraw' });
+      this.messageRider('payout_sent', `${formatINR(p.net)} sent to ${p.destination} (UTR ${p.utr})`);
+    }
+    if (changed) this.touch('notification');
+  }
+
+  private computeWallet(): WalletSummary {
+    const w = this.world;
+    const rider = this.requireRider();
+    const settledAt = w.settledAt ? Date.parse(w.settledAt) : 0;
+    const earned = Object.values(w.jobs)
+      .filter((j) => j.state === 'delivered' && j.deliveredAt && Date.parse(j.deliveredAt) > settledAt)
+      .reduce((sum, j) => sum + (w.earnings[j.id]?.total ?? 0), 0);
+    const instant = w.payouts.filter((p) => p.kind === 'instant' && Date.parse(p.createdAt) > settledAt);
+    const withdrawn = instant.filter((p) => holdsBalance(p.status)).reduce((sum, p) => sum + p.amount, 0);
+    const inFlight = instant.filter((p) => p.status === 'processing' || p.status === 'unknown').reduce((sum, p) => sum + p.amount, 0);
+    const balance = roundRupees(Math.max(0, earned - withdrawn));
+    const today = instant.filter((p) => holdsBalance(p.status) && isSameLocalDay(p.createdAt, new Date())).length;
+    const cash = this.cashInHand();
+    const payoutMethod = w.payout && w.payout.status === 'verified' ? clone(w.payout) : null;
+    return {
+      balance,
+      available: rider.status === 'approved' ? balance : 0,
+      inFlight: roundRupees(inFlight),
+      instant: {
+        enabled: true,
+        minAmount: DEMO_PAYOUT_RULES.minAmount,
+        maxAmount: DEMO_PAYOUT_RULES.maxAmount,
+        fee: DEMO_PAYOUT_RULES.fee,
+        withdrawalsLeftToday: Math.max(0, DEMO_PAYOUT_RULES.withdrawalsPerDay - today),
+        blockedReason:
+          rider.status !== 'approved'
+            ? 'Withdrawals open once your account is approved and active.'
+            : !canGoOnlineWithCash(cash, rider.cashLimit)
+              ? `Deposit your cash in hand (${formatINR(cash)}) first — it is above your ${formatINR(rider.cashLimit)} limit.`
+              : undefined,
+      },
+      weekly: { nextPayoutAt: nextWeeklyPayoutAt().toISOString(), description: 'Anything you do not withdraw is paid automatically every Monday.' },
+      payoutMethod,
+      recent: w.payouts.slice(0, 5).map(publicPayout),
+    };
+  }
+
+  async getWallet(): Promise<WalletSummary> {
+    await this.ready;
+    this.settlePayouts();
+    return this.computeWallet();
+  }
+
+  async listPayouts(): Promise<Paginated<PayoutTransfer>> {
+    await this.ready;
+    this.requireRider();
+    this.settlePayouts();
+    return { items: this.world.payouts.map(publicPayout), nextCursor: null };
+  }
+
+  async getPayout(id: string): Promise<PayoutTransfer> {
+    await this.ready;
+    this.requireRider();
+    this.settlePayouts();
+    const p = this.world.payouts.find((x) => x.id === id);
+    if (!p) throw new ApiError({ code: 'not_found', detail: 'Payout not found', status: 404 });
+    return publicPayout(p);
+  }
+
+  async requestWithdrawal(amount: number, idempotencyKey: string): Promise<PayoutTransfer> {
+    await this.ready;
+    this.requireRider();
+    this.settlePayouts();
+    // Same key → same transfer, exactly like the server (a retried request never pays twice).
+    const existing = this.world.payouts.find((p) => p.idempotencyKey === idempotencyKey);
+    if (existing) return publicPayout(existing);
+    const wallet = this.computeWallet();
+    const value = roundRupees(amount);
+    const problem = withdrawalProblem(value, wallet);
+    if (problem) {
+      const status = problem.code === 'rate_limited' ? 429 : problem.code === 'coming_soon' ? 501 : problem.code === 'no_payout_account' ? 409 : 422;
+      throw new ApiError({ code: problem.code, detail: problem.message, status });
+    }
+    const method = wallet.payoutMethod!;
+    const fee = wallet.instant.fee;
+    const payout: DemoPayout = {
+      id: newId('po'),
+      kind: 'instant',
+      mode: method.method === 'upi' ? 'upi' : 'imps',
+      amount: value,
+      fee,
+      net: roundRupees(value - fee),
+      status: 'processing',
+      destination: maskPayoutDestination(method),
+      createdAt: iso(),
+      idempotencyKey,
+      settleAt: new Date(Date.now() + DEMO_PAYOUT_RULES.settleSeconds * 1000).toISOString(),
+    };
+    this.world.payouts.unshift(payout);
+    this.touch('world');
+    return publicPayout(payout);
+  }
+
   async listNotifications(): Promise<Paginated<RiderNotification>> {
     await this.ready;
     return { items: [...this.world.notifications].sort((a, b) => b.createdAt.localeCompare(a.createdAt)), nextCursor: null };
@@ -1480,6 +1650,9 @@ export class LocalDemoProvider implements RiderDataProvider {
     return this.world.waits;
   }
 }
+
+/** Strips the simulation-only fields. */
+const publicPayout = ({ idempotencyKey: _key, settleAt: _settle, ...p }: DemoPayout): PayoutTransfer => clone(p);
 
 const maskNumber = (n: string): string => {
   const clean = n.replace(/\s/g, '');

@@ -27,7 +27,8 @@
 | `/status` | application-submitted, verification-pending, approval-pending-store/solo, approved, rejected, documents-expired, account-suspended | polled account status hub |
 | `/home` (tabs) | home-offline, home-online | GO ONLINE / OFFLINE, cash-limit / out-of-zone / suspended blocks, resume job |
 | `/tasks` (tabs) | job-history | Today / Yesterday / Earlier |
-| `/earnings` (tabs) | earnings-today | split, Withdraw (coming soon) |
+| `/earnings` (tabs) | earnings-today | split, WITHDRAW EARNINGS → `/earnings/withdraw` |
+| `/earnings/withdraw` | — (no frame) | balance, amount, destination, confirm, live transfer status, recent payouts (Cashfree) |
 | `/alerts` (tabs) | notifications | unread / read, deep links |
 | `/profile` (tabs) | profile | identity, type, vehicle, KYC, payout, zone/hub, SOS, support, sign out |
 | `/offer/[id]` | job-offer-manual, job-auto-accepted | 30 s countdown, accept / decline, expired / taken |

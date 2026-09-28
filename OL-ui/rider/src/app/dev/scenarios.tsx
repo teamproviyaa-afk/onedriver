@@ -19,6 +19,7 @@ import { getDemoSimulator } from '@/location/useLocationEngine';
 import { isDevBuild } from '@/config/env';
 import { DEMO_OTP_CODE, DEMO_RETURNING_PHONE, DEMO_STORE_INVITE_CODES } from '@/demo/constants';
 import { DEMO_NO_WHATSAPP_PHONES } from '@/domain/messaging';
+import { DEMO_PAYOUT_TEST_ACCOUNTS } from '@/domain/payouts';
 import type { DemoOutboxMessage } from '@/types';
 import { formatClock } from '@/utils/format';
 
@@ -125,6 +126,9 @@ export default function DevScenariosScreen() {
           <AppText variant="bodySm">Any other 10-digit number registers a new rider (OTP {DEMO_OTP_CODE}).</AppText>
           <AppText variant="bodySm">Store invite codes: {DEMO_STORE_INVITE_CODES.join(', ')}</AppText>
           <AppText variant="bodySm">Not on WhatsApp (SMS fallback): {DEMO_NO_WHATSAPP_PHONES.join(', ')}</AppText>
+          <AppText variant="bodySm">
+            Payout checks: UPI {DEMO_PAYOUT_TEST_ACCOUNTS.invalidVpaPrefix}@ybl (inactive) · {DEMO_PAYOUT_TEST_ACCOUNTS.mismatchVpaPrefix}@ybl (someone else&apos;s name) · bank A/C ending {DEMO_PAYOUT_TEST_ACCOUNTS.invalidAccountSuffix} / {DEMO_PAYOUT_TEST_ACCOUNTS.mismatchAccountSuffix}
+          </AppText>
         </Card>
       </View>
 

@@ -165,3 +165,46 @@ export interface MessageReceiptDto {
 export interface SosResultDto {
   contact_alert?: MessageReceiptDto | null;
 }
+
+/** PUT /rider/payout response (spec §5.1: `{ verified_name, status }`, plus the masked account). */
+export interface PayoutMethodDto {
+  id?: string;
+  method: 'bank' | 'upi';
+  holder_name?: string;
+  account_last4?: string;
+  ifsc?: string;
+  vpa?: string;
+  bank_name?: string;
+  verified_name?: string;
+  name_match?: 'good' | 'partial' | 'poor';
+  verified_at?: string;
+  status: 'pending' | 'verified' | 'failed';
+  is_primary?: boolean;
+  provider?: 'cashfree';
+}
+
+export interface PayoutTransferDto {
+  id: string;
+  kind: 'instant' | 'weekly';
+  mode: 'upi' | 'imps';
+  amount: number;
+  fee?: number;
+  net?: number;
+  status: 'processing' | 'unknown' | 'success' | 'failed' | 'reversed';
+  utr?: string | null;
+  status_description?: string | null;
+  destination: string;
+  period_label?: string | null;
+  created_at: string;
+  completed_at?: string | null;
+}
+
+export interface WalletDto {
+  balance: number;
+  available: number;
+  in_flight: number;
+  instant: { enabled: boolean; min_amount: number; max_amount: number; fee: number; withdrawals_left_today: number; blocked_reason?: string | null };
+  weekly: { next_payout_at: string; description: string };
+  payout_method: PayoutMethodDto | null;
+  recent: PayoutTransferDto[];
+}

@@ -124,6 +124,14 @@ alongside. The app only shows the channel used. Setup and provider accounts: [do
 Real sign-in codes on your phone: deploy with `bash supabase/setup-messaging.sh`, then `npm run start:live`
 (or the `preview-live` EAS profile). `DATA_MODE=supabase` uses real Supabase phone auth with demo data.
 
+## Payouts (Cashfree)
+
+Earnings → **WITHDRAW EARNINGS** sends the rider's unpaid balance to their verified UPI ID or bank account
+through Cashfree Payouts; the rest is paid every Monday. UPI IDs and bank accounts are verified with
+Cashfree (must be in the rider's name). The app holds no payout keys — the server-side `payouts` Edge
+Function in [`supabase/`](../../supabase) talks to Cashfree. Setup: [docs/PAYOUTS.md](docs/PAYOUTS.md).
+In the local demo it is fully simulated (dev scenario **Withdrawal Fails**, test UPI IDs `invalid@ybl`, `mismatch@ybl`).
+
 ## Security & privacy
 
 * Only the Supabase **publishable** key ships in the app. No service-role, admin, payout or server secrets.

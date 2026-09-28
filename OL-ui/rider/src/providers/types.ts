@@ -16,6 +16,8 @@ import type {
   Paginated,
   PayoutInput,
   PayoutMethod,
+  PayoutTransfer,
+  WalletSummary,
   PickupVerifyInput,
   PickupVerifyResult,
   ProfileInput,
@@ -149,6 +151,15 @@ export interface RiderDataProvider {
   /** Emails the weekly statement to the rider's email on file. */
   emailStatement(week: string): Promise<MessageReceipt>;
   getCash(): Promise<CashSummary>;
+  /** Balance, withdrawal limits, the verified payout account and recent transfers. */
+  getWallet(): Promise<WalletSummary>;
+  listPayouts(cursor?: string): Promise<Paginated<PayoutTransfer>>;
+  getPayout(id: string): Promise<PayoutTransfer>;
+  /**
+   * Instant withdrawal to the verified account (Cashfree Payouts on the server). The same
+   * idempotency key always maps to the same transfer, so retrying after a timeout never pays twice.
+   */
+  requestWithdrawal(amount: number, idempotencyKey: string): Promise<PayoutTransfer>;
   listNotifications(cursor?: string): Promise<Paginated<RiderNotification>>;
   markNotificationsRead(ids: string[]): Promise<void>;
 }

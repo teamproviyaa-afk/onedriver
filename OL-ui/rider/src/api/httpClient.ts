@@ -21,6 +21,11 @@ export interface RequestOptions {
 
 const KNOWN_CODES: ApiErrorCode[] = [
   'rate_limited',
+  'account_invalid',
+  'name_mismatch',
+  'no_payout_account',
+  'insufficient_balance',
+  'payout_blocked',
   'not_enrolled',
   'suspended',
   'cash_limit',

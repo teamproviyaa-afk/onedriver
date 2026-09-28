@@ -4,8 +4,8 @@
  * Privileged operations (pricing, geofence decisions, state) are decided by the server.
  */
 import { HttpClient } from '@/api/httpClient';
-import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, SosResultDto } from '@/api/dto';
-import { mapEarnings, mapJob, mapJobEarnings, mapMe, mapMessageReceipt, mapNotification, mapOffer, mapRider } from '@/api/mappers';
+import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, SosResultDto, WalletDto } from '@/api/dto';
+import { mapEarnings, mapJob, mapJobEarnings, mapMe, mapMessageReceipt, mapNotification, mapOffer, mapPayoutMethod, mapPayoutTransfer, mapRider, mapWallet } from '@/api/mappers';
 import type {
   CashSummary,
   DeclineReason,
@@ -24,6 +24,7 @@ import type {
   Paginated,
   PayoutInput,
   PayoutMethod,
+  PayoutTransfer,
   PickupVerifyInput,
   PickupVerifyResult,
   ProfileInput,
@@ -39,6 +40,7 @@ import type {
   RiderType,
   RiderVehicle,
   StatusInfo,
+  WalletSummary,
   StepInput,
   StoreLink,
   TrackPoint,
@@ -114,7 +116,8 @@ export class OneLocalApiProvider implements RiderDataProvider {
   }
   setPayout(input: PayoutInput): Promise<PayoutMethod> {
     const body = input.method === 'bank' ? { method: 'bank', holder: input.holder, account_no: input.accountNo, ifsc: input.ifsc } : { method: 'upi', vpa: input.vpa };
-    return this.http.put<PayoutMethod>('/rider/payout', body);
+    // The server verifies the account with Cashfree (bank / UPI name match) before saving it.
+    return this.http.put<PayoutMethodDto>('/rider/payout', body).then(mapPayoutMethod);
   }
   async submitApplication(): Promise<StatusInfo> {
     await this.http.post('/rider/submit');
@@ -221,6 +224,19 @@ export class OneLocalApiProvider implements RiderDataProvider {
   }
   getCash(): Promise<CashSummary> {
     return this.http.get<{ cash_in_hand: number; cash_limit: number; ledger: CashSummary['ledger']; deposit_instructions: string }>('/rider/cash').then((r) => ({ cashInHand: r.cash_in_hand, cashLimit: r.cash_limit, blocked: r.cash_in_hand >= r.cash_limit, ledger: r.ledger, depositInstructions: r.deposit_instructions }));
+  }
+  getWallet(): Promise<WalletSummary> {
+    return this.http.get<WalletDto>('/rider/wallet').then(mapWallet);
+  }
+  listPayouts(cursor?: string): Promise<Paginated<PayoutTransfer>> {
+    return this.http.get<{ items: PayoutTransferDto[]; next_cursor?: string | null }>('/rider/payouts', { cursor }).then((r) => ({ items: r.items.map(mapPayoutTransfer), nextCursor: r.next_cursor ?? null }));
+  }
+  getPayout(id: string): Promise<PayoutTransfer> {
+    return this.http.get<PayoutTransferDto>(`/rider/payouts/${encodeURIComponent(id)}`).then(mapPayoutTransfer);
+  }
+  /** The server forwards the Idempotency-Key to Cashfree as the transfer id seed — a retry never pays twice. */
+  requestWithdrawal(amount: number, idempotencyKey: string): Promise<PayoutTransfer> {
+    return this.http.post<PayoutTransferDto>('/rider/payouts/withdraw', { amount }, idempotencyKey).then(mapPayoutTransfer);
   }
   listNotifications(cursor?: string): Promise<Paginated<RiderNotification>> {
     return this.http.get<{ items: NotificationDto[]; next_cursor?: string | null }>('/rider/notifications', { cursor }).then((r) => ({ items: r.items.map(mapNotification), nextCursor: r.next_cursor ?? null }));

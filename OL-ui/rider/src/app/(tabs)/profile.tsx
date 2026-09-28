@@ -176,7 +176,7 @@ export default function ProfileScreen() {
           )}
         </Card>
 
-        <Card radius={46.5} padding={spacing.xxl} gap={spacing.md} onPress={() => router.push((payout ? `/onboarding/payout/${payout.method}` : '/onboarding/payout/upi') as never)} accessibilityLabel={payoutInfo ? `Payout method: ${payoutInfo.title}` : 'Add a payout method'}>
+        <Card radius={46.5} padding={spacing.xxl} gap={spacing.md} onPress={() => router.push((payout ? `/onboarding/payout/${payout.method}?mode=manage` : '/onboarding/payout/upi?mode=manage') as never)} accessibilityLabel={payoutInfo ? `Payout method: ${payoutInfo.title}` : 'Add a payout method'}>
           <AppText variant="titleSm">BANK PAYOUT METHOD</AppText>
           <View style={styles.payoutRow}>
             <Icon name={payoutInfo?.method === 'bank' ? 'landmark' : 'credit-card'} size={24} />

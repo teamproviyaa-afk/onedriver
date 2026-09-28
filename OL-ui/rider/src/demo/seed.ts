@@ -13,6 +13,7 @@ import type {
   JobEarnings,
   LatLng,
   PayoutMethod,
+  PayoutTransfer,
   Rider,
   RiderDocument,
   RiderNotification,
@@ -128,7 +129,39 @@ export const DEMO_DOCUMENTS: RiderDocument[] = [
   { id: 'doc-selfie', kind: 'selfie', status: 'verified', source: 'upload', reviewedAt: iso(daysAgo(38)) },
 ];
 
-export const DEMO_PAYOUT: PayoutMethod = { id: 'payout-1', method: 'upi', vpa: 'rahul.sharma@ybl', verifiedName: 'RAHUL SHARMA', verifiedAt: iso(daysAgo(36)), status: 'verified', isPrimary: true };
+export const DEMO_PAYOUT: PayoutMethod = { id: 'payout-1', method: 'upi', vpa: 'rahul.sharma@ybl', bankName: 'PhonePe · Yes Bank', verifiedName: 'RAHUL SHARMA', nameMatch: 'good', verifiedAt: iso(daysAgo(36)), status: 'verified', isPrimary: true, provider: 'demo' };
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const shortDate = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+
+/** When the last weekly payout ran — earnings delivered after this are in the wallet balance. */
+export const makeLastSettledAt = (): string => iso(daysAgo(1, 9, 0));
+
+/** Weekly payouts already paid to the demo rider (newest first). */
+export const makeDemoPayouts = (): PayoutTransfer[] =>
+  [
+    { at: daysAgo(1, 9, 0), amount: 3120, utr: '426109553201' },
+    { at: daysAgo(8, 9, 0), amount: 2860, utr: '425409112876' },
+  ].map(({ at, amount, utr }, i) => {
+    const end = new Date(at);
+    end.setDate(end.getDate() - 1);
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    return {
+      id: `po-weekly-${i + 1}`,
+      kind: 'weekly' as const,
+      mode: 'upi' as const,
+      amount,
+      fee: 0,
+      net: amount,
+      status: 'success' as const,
+      utr,
+      destination: 'UPI ra•••••@ybl',
+      periodLabel: `${shortDate(start)} – ${shortDate(end)}`,
+      createdAt: iso(at),
+      completedAt: iso(new Date(at.getTime() + 2 * 60000)),
+    };
+  });
 
 const baseJob = (over: Partial<Job> & Pick<Job, 'id' | 'orderRef' | 'pickup' | 'drop'>): Job => ({
   state: 'created',

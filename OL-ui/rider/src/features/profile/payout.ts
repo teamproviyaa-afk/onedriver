@@ -1,6 +1,7 @@
 import { DEMO_RIDER_CODE } from '@/demo/constants';
 import { DEMO_PAYOUT } from '@/demo/seed';
 import { isLocalDemo } from '@/config/env';
+import { useWallet } from '@/hooks/queries';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import type { PayoutMethod, Rider } from '@/types';
 
@@ -24,16 +25,19 @@ export const describePayout = (p: PayoutMethod): PayoutDisplay => {
   if (p.method === 'upi') {
     return { method: 'upi', status: p.status, title: `UPI${primary}`, subtitle: `UPI: ${p.vpa ? maskVpa(p.vpa) : '••••'}${p.verifiedName ? ` • ${p.verifiedName}` : ''}` };
   }
-  return { method: 'bank', status: p.status, title: `Bank account${primary}`, subtitle: `A/C: ****${p.accountLast4 ?? '••••'}${p.ifsc ? ` • ${p.ifsc}` : ''}` };
+  return { method: 'bank', status: p.status, title: `Bank account${primary}`, subtitle: `A/C: ****${p.accountLast4 ?? '••••'}${p.ifsc ? ` • ${p.ifsc}` : ''}${p.verifiedName ? ` • ${p.verifiedName}` : ''}` };
 };
 
 /**
- * `GET /rider/me` does not carry the payout method, so the profile resolves it from
- * the onboarding draft (riders who enrolled on this device) and, for the seeded demo
- * rider in local demo mode, from the demo fixture. Returns null when nothing is set up.
+ * `GET /rider/me` does not carry the payout method: the verified account comes from
+ * `GET /rider/wallet`; until that loads (or when it is unavailable) the profile falls back
+ * to the onboarding draft (riders who enrolled on this device) and, for the seeded demo
+ * rider in local demo mode, to the demo fixture. Returns null when nothing is set up.
  */
 export const usePayoutMethod = (rider: Rider | null | undefined): PayoutMethod | null => {
   const draft = useOnboardingStore((s) => s.payout);
+  const wallet = useWallet();
+  if (wallet.data?.payoutMethod) return wallet.data.payoutMethod;
   if (draft) {
     if (draft.method === 'upi') {
       return { id: 'draft-upi', method: 'upi', vpa: draft.vpa, verifiedName: draft.verifiedName, status: draft.verifiedName ? 'verified' : 'pending', isPrimary: true };

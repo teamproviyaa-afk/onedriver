@@ -21,6 +21,11 @@ export type ApiErrorCode =
   | 'coming_soon'
   | 'validation'
   | 'rate_limited'
+  | 'account_invalid'
+  | 'name_mismatch'
+  | 'no_payout_account'
+  | 'insufficient_balance'
+  | 'payout_blocked'
   | 'unknown';
 
 export interface ApiErrorShape {
