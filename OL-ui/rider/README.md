@@ -114,6 +114,13 @@ Android foreground service, demo route simulator, track batching), `src/notifica
 
 See `docs/ARCHITECTURE.md`, `docs/API_MAP.md`, `docs/DECISIONS.md`, `docs/QA.md`.
 
+## Messaging (WhatsApp → SMS, email)
+
+Sign-in codes, the customer's delivery OTP, receipts, approvals, payouts, statements and SOS alerts are
+sent by the server-side `notify` Edge Function in [`supabase/`](../../supabase): WhatsApp first, SMS when
+the number is not on WhatsApp (or WhatsApp fails, times out, or the code is requested again), email
+alongside. The app only shows the channel used. Setup and provider accounts: [docs/MESSAGING.md](docs/MESSAGING.md).
+
 ## Security & privacy
 
 * Only the Supabase **publishable** key ships in the app. No service-role, admin, payout or server secrets.

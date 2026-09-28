@@ -33,14 +33,20 @@ Headers on every call: `authorization: Bearer <supabase access token>`, `x-app: 
 | `POST /rider/jobs/:id/track` | `track` | track batcher |
 | `POST /rider/jobs/:id/proof` | `submitProof` | proof/otp, proof/photo, proof/signature |
 | `POST /rider/jobs/:id/exception` | `raiseException` | pickup/waiting, mismatch, incomplete, issue/*, sos |
-| `POST /rider/sos` | `sos` | /job/[id]/sos, /sos |
+| `POST /rider/sos` → `{ contact_alert }` | `sos` | /job/[id]/sos, /sos (emergency contact alerted on WhatsApp + SMS) |
+| `POST /rider/jobs/:id/otp/resend` | `resendDeliveryOtp` | proof/otp "Customer didn't get it?" (WhatsApp → SMS, 30 s cooldown, 429 `rate_limited`) |
 | `POST /rider/jobs/:id/call` | `getCallNumber` | active delivery, arrived, issue screens |
 | `GET /rider/earnings?range=` | `getEarnings` | /earnings, /earnings/week |
 | `GET /rider/earnings/jobs/:id` | `getJobEarnings` | /earnings/job/[id], /job/[id]/done |
 | `GET /rider/jobs?cursor=` | `listJobs` | /tasks |
 | `GET /rider/statements/:week.pdf` | `getStatementUrl` | /earnings/week |
+| `POST /rider/statements/:week/email` | `emailStatement` | /earnings/week "Email me this statement" (400 `validation` without an email) |
 | `GET /rider/cash` | `getCash` | /cash |
 | `GET /rider/notifications` · `POST /rider/notifications/read` | `listNotifications` / `markNotificationsRead` | /alerts |
 
 Addition to the spec's step list: `to: "picked_up"` (spec §5.2 lists the state but omits it from the step body); the
 demo provider and API provider both send it so `pickup_verified → picked_up` is an explicit rider action ("Proceed to delivery").
+
+Messaging (WhatsApp → SMS fallback, email) is sent by the server through the `notify` Edge Function;
+job responses may carry `otp_delivery` (how the customer received the delivery OTP, no number) and
+`PUT /rider/profile` accepts an optional `email`. See [MESSAGING.md](MESSAGING.md).

@@ -2,6 +2,7 @@ import type { IsoDate, Rupees } from './common';
 import type { LatLng, PlacePoint } from './location';
 import type { DeliveryCategory } from './rider';
 import type { ProofMethod } from './proof';
+import type { MessageReceipt } from './messaging';
 
 /**
  * 12-state delivery engine (spec §4.1 / Figma rider-state-machine).
@@ -86,6 +87,8 @@ export interface Job {
   pickupCodeHint?: string;
   otpAttempts: number;
   otpLocked: boolean;
+  /** How the customer received the delivery OTP (server-reported; no number). */
+  otpDelivery?: MessageReceipt;
   riderId?: string;
   acceptedAt?: IsoDate;
   deliveredAt?: IsoDate;

@@ -1,9 +1,13 @@
 import { getSupabase } from './supabaseClient';
-import type { AuthProvider, AuthSession, OtpChallenge } from '@/providers/types';
+import type { AuthProvider, AuthSession, OtpChallenge, SendOtpOptions } from '@/providers/types';
 import { ApiError } from '@/types';
 import { OTP } from '@/domain/otp';
 
-/** Supabase phone auth (MSG91 + DLT SMS provider configured server-side). */
+/**
+ * Supabase phone auth. The code is delivered by the `notify` Edge Function through the Auth
+ * "Send SMS" hook: WhatsApp first, SMS when the number is not on WhatsApp, and SMS for a resend
+ * shortly after a WhatsApp send. The app cannot see which channel the hook used.
+ */
 export class SupabaseAuthProvider implements AuthProvider {
   readonly kind = 'supabase' as const;
 
@@ -20,10 +24,13 @@ export class SupabaseAuthProvider implements AuthProvider {
     return { userId: s.user.id, phone: s.user.phone ?? '', accessToken: s.access_token, refreshToken: s.refresh_token, expiresAt: s.expires_at ? new Date(s.expires_at * 1000).toISOString() : undefined };
   }
 
-  async sendOtp(phone: string): Promise<OtpChallenge> {
+  async sendOtp(phone: string, _options: SendOtpOptions = {}): Promise<OtpChallenge> {
     const { error } = await this.client.auth.signInWithOtp({ phone: toE164(phone) });
-    if (error) throw new ApiError({ code: 'unknown', detail: error.message });
-    return { phone, expiresInSeconds: 300, resendAfterSeconds: OTP.resendSeconds };
+    if (error) {
+      const limited = error.status === 429 || /rate limit|too many/i.test(error.message);
+      throw new ApiError({ code: limited ? 'rate_limited' : 'unknown', detail: limited ? 'Too many codes requested. Wait a few minutes and try again.' : error.message, status: error.status });
+    }
+    return { phone, expiresInSeconds: 300, resendAfterSeconds: OTP.resendSeconds, delivery: { channel: 'unknown' } };
   }
 
   async verifyOtp(phone: string, code: string): Promise<AuthSession> {

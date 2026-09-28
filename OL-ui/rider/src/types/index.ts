@@ -11,3 +11,4 @@ export * from './exception';
 export * from './earnings';
 export * from './notification';
 export * from './sync';
+export * from './messaging';

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { Image, Linking, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
-import { AppText, Card, ErrorState, LoadingState, Screen, SecondaryButton, toast } from '@/components/ui';
+import { AppText, Card, ErrorState, GhostButton, LoadingState, Screen, SecondaryButton, toast } from '@/components/ui';
+import { ApiError } from '@/types';
 import { AppHeader } from '@/components/app';
 import { WeeklyChart } from '@/features/earnings/components/WeeklyChart';
 import { isoWeekOf, seriesDate, weekRangeLabel } from '@/features/earnings/week';
@@ -16,6 +17,7 @@ import { formatINR } from '@/utils/format';
 export default function WeeklyStatementScreen() {
   const { data, isLoading, error, refetch } = useEarnings('week');
   const [downloading, setDownloading] = useState(false);
+  const [emailing, setEmailing] = useState(false);
 
   const week = useMemo(() => {
     const last = data?.series[data.series.length - 1];
@@ -43,10 +45,35 @@ export default function WeeklyStatementScreen() {
     }
   };
 
+  const emailStatement = async () => {
+    setEmailing(true);
+    try {
+      const r = await getDataProvider().emailStatement(week);
+      if (r.status === 'sent') toast.success(`Statement sent to ${r.toMasked ?? 'your email'}`);
+      else toast.error('Could not send the statement. Try again later.');
+    } catch (e) {
+      if (ApiError.is(e, 'validation')) {
+        toast.error(e.detail);
+        router.push('/profile' as never);
+      } else {
+        toast.error(ApiError.is(e) ? e.detail : 'Could not send the statement. Try again later.');
+      }
+    } finally {
+      setEmailing(false);
+    }
+  };
+
   const insights = data?.insights ?? [];
 
   return (
-    <Screen scroll footer={<SecondaryButton label="DOWNLOAD DETAILED PDF" onPress={() => void download()} loading={downloading} disabled={!data} />}>
+    <Screen
+      scroll
+      footer={
+        <View style={styles.footer}>
+          <SecondaryButton label="DOWNLOAD DETAILED PDF" onPress={() => void download()} loading={downloading} disabled={!data} />
+          <GhostButton label={emailing ? 'Sending…' : 'Email me this statement'} onPress={() => void emailStatement()} disabled={!data || emailing} />
+        </View>
+      }>
       <AppHeader title="Weekly Statement" backIcon="chevron-left" onHelp={() => router.push('/support' as never)} />
 
       {isLoading && !data ? (
@@ -105,6 +132,7 @@ export default function WeeklyStatementScreen() {
 }
 
 const styles = StyleSheet.create({
+  footer: { gap: spacing.xs },
   body: { gap: spacing.x3l, paddingTop: spacing.lg },
   heroLabel: { fontFamily: fontFamily.manropeBold, fontSize: 13, lineHeight: 18 },
   heroAmount: { fontFamily: fontFamily.manropeExtraBold, fontSize: 32, lineHeight: 40 },

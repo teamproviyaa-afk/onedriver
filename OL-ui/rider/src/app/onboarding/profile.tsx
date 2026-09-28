@@ -36,6 +36,7 @@ export default function ProfileSetupScreen() {
   const pendingName = useAuthStore((s) => s.pendingRegistration?.fullName);
   const ownPhone = useAuthStore((s) => s.session?.phone ?? s.pendingPhone);
   const meName = useRiderStore((s) => s.me?.rider.fullName);
+  const meEmail = useRiderStore((s) => s.me?.rider.email);
 
   const [photoUri, setPhotoUri] = useState<string | null>(draftPhotoUri ?? null);
   const [sheet, setSheet] = useState(false);
@@ -44,6 +45,7 @@ export default function ProfileSetupScreen() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const emergencyRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
 
   const {
     control,
@@ -52,7 +54,7 @@ export default function ProfileSetupScreen() {
     formState: { errors },
   } = useForm<ProfileFormInput, unknown, ProfileFormOutput>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { fullName: draftName || pendingName || meName || '', emergencyPhone: draftEmergency, language: draftLanguage },
+    defaultValues: { fullName: draftName || pendingName || meName || '', emergencyPhone: draftEmergency, email: meEmail ?? '', language: draftLanguage },
     mode: 'onSubmit',
     reValidateMode: 'onChange',
   });
@@ -92,6 +94,7 @@ export default function ProfileSetupScreen() {
         const rider = await provider.updateProfile({
           fullName: values.fullName,
           emergencyPhone: values.emergencyPhone,
+          email: values.email,
           language: values.language,
           photoUri: photoUri ?? undefined,
           photoAssetId,
@@ -166,10 +169,32 @@ export default function ProfileSetupScreen() {
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                editable={!saving}
+                error={errors.emergencyPhone?.message}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="email"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <PillField
+                ref={emailRef}
+                label="Email (optional)"
+                placeholder="For statements and payouts"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
                 returnKeyType="done"
                 onSubmitEditing={() => void handleSubmit(onSave)()}
                 editable={!saving}
-                error={errors.emergencyPhone?.message}
+                error={errors.email?.message}
               />
             )}
           />

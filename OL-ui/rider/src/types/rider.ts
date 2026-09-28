@@ -71,6 +71,8 @@ export interface Rider {
   photoAssetId?: string;
   photoUri?: string;
   emergencyPhone?: string;
+  /** Optional — statements, payout and approval emails. */
+  email?: string;
   language: AppLanguage;
   type: RiderType;
   status: RiderStatus;
@@ -121,6 +123,7 @@ export interface ProfileInput {
   photoAssetId?: string;
   photoUri?: string;
   emergencyPhone: string;
+  email?: string;
   language: AppLanguage;
 }
 

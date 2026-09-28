@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { colors, spacing } from '@/theme';
 import { AppText, Card, Divider, Icon, PrimaryButton, toast } from '@/components/ui';
-import { FloatingJobHeader, NumericKeypad, OTPInput } from '@/components/app';
+import { FloatingJobHeader, MessageDeliveryNote, NumericKeypad, OTPInput } from '@/components/app';
 import { useJobActions } from '@/hooks';
+import { useCountdown } from '@/hooks/useCountdown';
+import { MESSAGING, describeDelivery } from '@/domain/messaging';
+import { addSeconds } from '@/utils/time';
 import { ApiError } from '@/types';
 import { OTP, attemptsLeft } from '@/domain/otp';
 import { getDemoProvider } from '@/providers';
@@ -22,7 +25,8 @@ import { DeliveryStepper, JobDrawerLayout, JobScreenFallback, figmaText } from '
 export default function ProofOtpScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { job, isLoading, error, refetch, lockRedirect, unlockRedirect } = useJobScreen(id, ['handover', 'proof']);
-  const { submitProof } = useJobActions();
+  const { submitProof, resendDeliveryOtp } = useJobActions();
+  const [resending, setResending] = useState(false);
   const [code, setCode] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,9 +51,30 @@ export default function ProofOtpScreen() {
     if (job && !otpAllowed) router.replace(`/job/${job.id}/proof` as never);
   }, [job, otpAllowed]);
 
+  const delivery = job?.otpDelivery;
+  const resendAt = delivery ? addSeconds(delivery.sentAt, delivery.resendAfterSeconds ?? MESSAGING.resendCooldownSeconds) : null;
+  const resendIn = useCountdown(resendAt);
+  // The server sends a resend by SMS within 5 min of a WhatsApp send, or when WhatsApp isn't available.
+  const escalateIn = useCountdown(delivery ? addSeconds(delivery.sentAt, MESSAGING.resendEscalationSeconds) : null);
+  const resendBySms = delivery?.channel === 'sms' || (delivery?.channel === 'whatsapp' && escalateIn > 0);
+
   if (!job) return <JobScreenFallback error={isLoading ? null : error} onRetry={refetch} />;
 
   const locked = job.otpLocked || lockedLocally;
+
+  const resend = async () => {
+    if (resending || resendIn > 0) return;
+    setResending(true);
+    try {
+      const r = await resendDeliveryOtp(job);
+      if (r.status === 'sent') toast.success(`Code sent again to ${job.drop.customerFirstName} ${describeDelivery(r)}`);
+      else toast.error('Could not resend the code. Ask the customer to check their messages or use photo proof.');
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setResending(false);
+    }
+  };
   const left = attemptsLeft(job.otpAttempts);
   const complete = code.length === OTP.deliveryLength;
 
@@ -95,7 +120,8 @@ export default function ProofOtpScreen() {
       <View style={styles.heading}>
         <AppText variant="h4">Enter Customer OTP</AppText>
         <AppText style={figmaText.body13} color="textSecondary">
-          {OTP.deliveryLength}-digit verification code has been shared with {job.drop.customerFirstName}.
+          {OTP.deliveryLength}-digit verification code has been shared with {job.drop.customerFirstName}
+          {delivery?.status === 'sent' ? ` ${describeDelivery(delivery)}` : ''}.
         </AppText>
       </View>
 
@@ -126,6 +152,19 @@ export default function ProofOtpScreen() {
               Demo OTP: {demoOtp}
             </AppText>
           ) : null}
+          <Pressable
+            onPress={() => void resend()}
+            disabled={resending || resendIn > 0 || busy}
+            accessibilityRole="button"
+            accessibilityLabel={resendIn > 0 ? `Resend code in ${resendIn} seconds` : 'Resend code to customer'}
+            hitSlop={8}
+            style={styles.resend}>
+            <MessageDeliveryNote
+              channel="sms"
+              align="center"
+              text={resending ? 'Sending…' : resendIn > 0 ? `Customer didn't get it? Resend in ${resendIn}s` : `Customer didn't get it? ${resendBySms ? 'Resend by SMS' : 'Resend code'}`}
+            />
+          </Pressable>
           <NumericKeypad
             onDigit={(d) => {
               setMessage(null);
@@ -144,4 +183,5 @@ const styles = StyleSheet.create({
   heading: { gap: spacing.md },
   lockedCard: { alignSelf: 'stretch' },
   lockedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  resend: { alignSelf: 'center', minHeight: 32, justifyContent: 'center' },
 });

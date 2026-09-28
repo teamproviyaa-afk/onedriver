@@ -20,6 +20,7 @@ export interface RequestOptions {
 }
 
 const KNOWN_CODES: ApiErrorCode[] = [
+  'rate_limited',
   'not_enrolled',
   'suspended',
   'cash_limit',
@@ -102,7 +103,7 @@ export class HttpClient {
       const detailRaw = json && typeof json === 'object' ? (json as { detail?: unknown }).detail : undefined;
       const detail = typeof detailRaw === 'string' ? detailRaw : res.statusText || 'Request failed';
       throw new ApiError({
-        code: KNOWN_CODES.includes(code as ApiErrorCode) ? (code as ApiErrorCode) : res.status === 401 ? 'unauthorized' : res.status === 404 ? 'not_found' : 'unknown',
+        code: KNOWN_CODES.includes(code as ApiErrorCode) ? (code as ApiErrorCode) : res.status === 401 ? 'unauthorized' : res.status === 404 ? 'not_found' : res.status === 429 ? 'rate_limited' : 'unknown',
         detail,
         status: res.status,
         meta: json && typeof json === 'object' ? (json as Record<string, unknown>) : undefined,

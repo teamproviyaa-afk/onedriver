@@ -4,8 +4,8 @@
  * Privileged operations (pricing, geofence decisions, state) are decided by the server.
  */
 import { HttpClient } from '@/api/httpClient';
-import type { EarningsDto, JobDto, JobEarningsDto, MeDto, NotificationDto, OfferDto } from '@/api/dto';
-import { mapEarnings, mapJob, mapJobEarnings, mapMe, mapNotification, mapOffer, mapRider } from '@/api/mappers';
+import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, SosResultDto } from '@/api/dto';
+import { mapEarnings, mapJob, mapJobEarnings, mapMe, mapMessageReceipt, mapNotification, mapOffer, mapRider } from '@/api/mappers';
 import type {
   CashSummary,
   DeclineReason,
@@ -44,6 +44,8 @@ import type {
   TrackPoint,
   VehicleInput,
   ZoneLookup,
+  MessageReceipt,
+  SosResult,
 } from '@/types';
 import type { AvailabilityInput, HeartbeatInput, RiderDataProvider, SosInput } from './types';
 
@@ -68,6 +70,7 @@ export class OneLocalApiProvider implements RiderDataProvider {
       full_name: input.fullName,
       photo_asset_id: input.photoAssetId,
       emergency_phone: input.emergencyPhone,
+      email: input.email,
       language: input.language,
     });
     return mapRider(r);
@@ -187,8 +190,13 @@ export class OneLocalApiProvider implements RiderDataProvider {
   resolveWait(id: string, kind: 'not_ready' | 'unavailable', outcome: 'continue' | 'escalate'): Promise<ExceptionResponse> {
     return this.http.post<ExceptionResponse>(`/rider/jobs/${id}/exception/resolve`, { kind, outcome });
   }
-  async sos(input: SosInput, idempotencyKey?: string) {
-    await this.http.post('/rider/sos', { job_id: input.jobId, lat: input.lat, lng: input.lng }, idempotencyKey);
+  async sos(input: SosInput, idempotencyKey?: string): Promise<SosResult> {
+    const r = await this.http.post<SosResultDto | undefined>('/rider/sos', { job_id: input.jobId, lat: input.lat, lng: input.lng }, idempotencyKey);
+    return { contactAlert: r?.contact_alert ? mapMessageReceipt(r.contact_alert) : null };
+  }
+  /** Server re-sends the customer's delivery OTP (WhatsApp → SMS); 429 rate_limited on cooldown. */
+  async resendDeliveryOtp(id: string): Promise<MessageReceipt> {
+    return mapMessageReceipt(await this.http.post<MessageReceiptDto>(`/rider/jobs/${id}/otp/resend`));
   }
   getCallNumber(id: string): Promise<{ number: string }> {
     return this.http.post<{ number: string }>(`/rider/jobs/${id}/call`);
@@ -204,6 +212,9 @@ export class OneLocalApiProvider implements RiderDataProvider {
   }
   listJobs(cursor?: string): Promise<Paginated<JobHistoryItem>> {
     return this.http.get<{ items: JobHistoryItem[]; next_cursor?: string | null }>('/rider/jobs', { cursor }).then((r) => ({ items: r.items, nextCursor: r.next_cursor ?? null }));
+  }
+  async emailStatement(week: string): Promise<MessageReceipt> {
+    return mapMessageReceipt(await this.http.post<MessageReceiptDto>(`/rider/statements/${week}/email`));
   }
   async getStatementUrl(week: string): Promise<string> {
     return `${(this.http as unknown as { baseUrl: string }).baseUrl}/rider/statements/${week}.pdf`;

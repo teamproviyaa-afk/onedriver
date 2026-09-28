@@ -18,6 +18,9 @@ import { processQueue, simulateSyncError } from '@/offline/queueEngine';
 import { getDemoSimulator } from '@/location/useLocationEngine';
 import { isDevBuild } from '@/config/env';
 import { DEMO_OTP_CODE, DEMO_RETURNING_PHONE, DEMO_STORE_INVITE_CODES } from '@/demo/constants';
+import { DEMO_NO_WHATSAPP_PHONES } from '@/domain/messaging';
+import type { DemoOutboxMessage } from '@/types';
+import { formatClock } from '@/utils/format';
 
 /**
  * Development-only scenario switcher (never bundled behaviour in production builds):
@@ -36,6 +39,20 @@ export default function DevScenariosScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [otp, setOtp] = useState<string | undefined>();
   const [code, setCode] = useState<string | undefined>();
+  const [outbox, setOutbox] = useState<DemoOutboxMessage[]>([]);
+
+  // The demo world loads asynchronously; read the outbox once loaded and after every change.
+  useEffect(() => {
+    if (!demo) return;
+    let active = true;
+    const refresh = () => void demo.getDemoOutbox().then((list) => active && setOutbox(list));
+    refresh();
+    const unsubscribe = demo.onEvent(refresh);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [demo]);
 
   useEffect(() => {
     if (!demo || !job) return;
@@ -107,6 +124,36 @@ export default function DevScenariosScreen() {
           <AppText variant="bodySm">Returning rider phone: {DEMO_RETURNING_PHONE} · OTP {DEMO_OTP_CODE}</AppText>
           <AppText variant="bodySm">Any other 10-digit number registers a new rider (OTP {DEMO_OTP_CODE}).</AppText>
           <AppText variant="bodySm">Store invite codes: {DEMO_STORE_INVITE_CODES.join(', ')}</AppText>
+          <AppText variant="bodySm">Not on WhatsApp (SMS fallback): {DEMO_NO_WHATSAPP_PHONES.join(', ')}</AppText>
+        </Card>
+      </View>
+
+      <View style={styles.section}>
+        <SectionLabel>Messages sent (WhatsApp → SMS)</SectionLabel>
+        <Card radius={20} padding={16} gap={10}>
+          {outbox.length === 0 ? (
+            <AppText variant="bodySm" color="textSecondary">
+              Nothing yet. Sign in, pick up an order, deliver it or press SOS to see what the server would send.
+            </AppText>
+          ) : (
+            outbox.slice(0, 12).map((m) => (
+              <View key={m.id} style={styles.msgRow} accessible accessibilityLabel={`${OUTBOX_CHANNEL[m.channel]} to ${m.audience}: ${m.summary}`}>
+                <View style={[styles.msgChip, m.channel === 'whatsapp' ? styles.msgChipWa : m.channel === 'sms' ? styles.msgChipSms : styles.msgChipMail]}>
+                  <AppText variant="labelXs">{OUTBOX_CHANNEL[m.channel]}</AppText>
+                </View>
+                <View style={styles.msgBody}>
+                  <AppText variant="bodySemi" numberOfLines={1}>
+                    {m.summary}
+                  </AppText>
+                  <AppText variant="bodySm" color="textSecondary" numberOfLines={2}>
+                    {formatClock(m.at)} · {OUTBOX_AUDIENCE[m.audience]} {m.toMasked}
+                    {m.fallbackUsed ? ` · fallback: ${OUTBOX_REASON[m.fallbackReason ?? ''] ?? 'SMS'}` : ''}
+                  </AppText>
+                </View>
+              </View>
+            ))
+          )}
+          {outbox.length ? <GhostButton label="Clear messages" onPress={() => void demo?.clearDemoOutbox()} /> : null}
         </Card>
       </View>
 
@@ -159,6 +206,17 @@ export default function DevScenariosScreen() {
   );
 }
 
+const OUTBOX_CHANNEL: Record<DemoOutboxMessage['channel'], string> = { whatsapp: 'WHATSAPP', sms: 'SMS', email: 'EMAIL' };
+const OUTBOX_AUDIENCE: Record<DemoOutboxMessage['audience'], string> = { rider: 'to rider', customer: 'to customer', emergency_contact: 'to emergency contact' };
+const OUTBOX_REASON: Record<string, string> = {
+  no_whatsapp: 'not on WhatsApp',
+  known_no_whatsapp: 'known not on WhatsApp',
+  whatsapp_failed: 'WhatsApp failed',
+  whatsapp_timeout: 'WhatsApp not delivered in time',
+  resend_escalated: 'resend by SMS',
+  whatsapp_unavailable: 'WhatsApp not configured',
+};
+
 const Row = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
   <View style={styles.row}>
     <AppText variant="bodySemi" style={styles.rowLabel}>
@@ -169,6 +227,12 @@ const Row = ({ label, value, onChange }: { label: string; value: boolean; onChan
 );
 
 const styles = StyleSheet.create({
+  msgRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  msgChip: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 100, marginTop: 2 },
+  msgChipWa: { backgroundColor: colors.surfaceLime },
+  msgChipSms: { backgroundColor: colors.surfaceWarning },
+  msgChipMail: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  msgBody: { flex: 1, gap: 2 },
   section: { gap: spacing.md, marginTop: spacing.x3l },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.lg },
   rowLabel: { flex: 1 },

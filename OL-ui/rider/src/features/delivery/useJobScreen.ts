@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 
 import { useJob } from '@/hooks';
 import { routeForJob } from '@/state-machine/deliveryStateMachine';
@@ -28,10 +28,16 @@ export const useJobScreen = (id: string | undefined, allowed: readonly JobState[
   const { job: raw, isLoading, error, refetch } = useJob(id);
   const locked = useRef(false);
   const matches = !!raw && allowed.includes(raw.state);
+  const focused = useIsFocused();
+  const jobId = raw?.id;
+  const jobState = raw?.state;
 
+  // Only the screen in front may redirect, and only when the job's state changes: earlier screens
+  // stay mounted in the stack and must not react to updates such as a resent customer code.
   useEffect(() => {
-    if (raw && !matches && !locked.current) router.replace(routeForJob(raw) as never);
-  }, [raw, matches]);
+    if (!focused || !jobId || !jobState || matches || locked.current) return;
+    router.replace(routeForJob({ id: jobId, state: jobState }) as never);
+  }, [focused, jobId, jobState, matches]);
 
   const lockRedirect = useCallback(() => {
     locked.current = true;

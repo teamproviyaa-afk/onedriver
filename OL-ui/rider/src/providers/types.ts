@@ -30,12 +30,15 @@ import type {
   RiderStatus,
   RiderType,
   RiderVehicle,
+  SosResult,
   StatusInfo,
   StepInput,
   StoreLink,
   TrackPoint,
   VehicleInput,
   ZoneLookup,
+  MessageReceipt,
+  OtpDelivery,
 } from '@/types';
 
 export interface AuthSession {
@@ -51,15 +54,22 @@ export interface OtpChallenge {
   phone: string;
   expiresInSeconds: number;
   resendAfterSeconds: number;
+  /** WhatsApp or SMS (the server falls back to SMS when the number is not on WhatsApp). */
+  delivery?: OtpDelivery;
   /** Local demo only — never returned by production providers. */
   demoCode?: string;
+}
+
+export interface SendOtpOptions {
+  /** "Resend" — the server sends this one by SMS when WhatsApp was just used. */
+  resend?: boolean;
 }
 
 /** Phone + OTP authentication (Supabase phone auth in production, deterministic demo locally). */
 export interface AuthProvider {
   readonly kind: 'demo' | 'supabase';
   restoreSession(): Promise<AuthSession | null>;
-  sendOtp(phone: string): Promise<OtpChallenge>;
+  sendOtp(phone: string, options?: SendOtpOptions): Promise<OtpChallenge>;
   verifyOtp(phone: string, code: string): Promise<AuthSession>;
   signOut(): Promise<void>;
   getAccessToken(): Promise<string | null>;
@@ -126,14 +136,18 @@ export interface RiderDataProvider {
   submitProof(id: string, input: ProofInput, idempotencyKey?: string): Promise<ProofResult>;
   raiseException(id: string, input: ExceptionInput, idempotencyKey?: string): Promise<ExceptionResponse>;
   resolveWait(id: string, kind: 'not_ready' | 'unavailable', outcome: 'continue' | 'escalate'): Promise<ExceptionResponse>;
-  sos(input: SosInput, idempotencyKey?: string): Promise<void>;
+  sos(input: SosInput, idempotencyKey?: string): Promise<SosResult>;
   getCallNumber(id: string): Promise<{ number: string }>;
+  /** Re-sends the customer's delivery OTP (WhatsApp → SMS). The rider never sees the number. */
+  resendDeliveryOtp(id: string): Promise<MessageReceipt>;
 
   // ── Money & history (§5.3) ────────────────────────────────────────
   getEarnings(range: 'today' | 'week' | 'month'): Promise<EarningsSummary>;
   getJobEarnings(id: string): Promise<{ earnings: JobEarnings; job: JobHistoryItem }>;
   listJobs(cursor?: string): Promise<Paginated<JobHistoryItem>>;
   getStatementUrl(week: string): Promise<string>;
+  /** Emails the weekly statement to the rider's email on file. */
+  emailStatement(week: string): Promise<MessageReceipt>;
   getCash(): Promise<CashSummary>;
   listNotifications(cursor?: string): Promise<Paginated<RiderNotification>>;
   markNotificationsRead(ids: string[]): Promise<void>;

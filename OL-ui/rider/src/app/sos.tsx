@@ -55,10 +55,17 @@ export default function SafetyScreen() {
   const triggerSos = async () => {
     setSending(true);
     try {
-      await sos(job?.id);
+      const result = await sos(job?.id);
       setAlerted(true);
       setConfirmSos(false);
-      toast.success('SOS sent. Operations have been alerted.');
+      const alert = result?.contactAlert;
+      toast.success(
+        !result
+          ? 'SOS saved. It will be sent as soon as you are back online.'
+          : alert?.status === 'sent'
+            ? `SOS sent. Operations and your emergency contact were alerted (${alert.channel === 'whatsapp' ? 'WhatsApp + SMS' : 'SMS'}).`
+            : 'SOS sent. Operations have been alerted.',
+      );
     } catch (e) {
       toast.error(ApiError.is(e) ? e.detail : 'Could not send the SOS. Call the helpline now.');
     } finally {

@@ -12,6 +12,10 @@ import { ApiError } from '@/types';
 import type {
   CashLedgerEntry,
   CashSummary,
+  DemoOutboxMessage,
+  MessageAudience,
+  MessageReceipt,
+  SosResult,
   DeclineReason,
   DeliveryEvent,
   DeliveryException,
@@ -58,6 +62,7 @@ import { haversineM, pointInPolygon } from '@/domain/geo';
 import { GEOFENCE, checkProofDistance } from '@/domain/geofence';
 import { DISPATCH } from '@/domain/dispatch';
 import { computeEarnings } from '@/domain/earnings';
+import { MESSAGING, type MessagePolicy, demoHasWhatsApp, maskEmailForDisplay, maskPhoneForDisplay, normalizeEmail, routeMessage } from '@/domain/messaging';
 import { cashLedgerBalance, canGoOnlineWithCash } from '@/domain/cash';
 import { canCallCustomer } from '@/domain/privacy';
 import { OTP } from '@/domain/otp';
@@ -91,7 +96,7 @@ import {
 import { newId } from '@/utils/ids';
 import { isSameLocalDay } from '@/utils/time';
 import { log } from '@/utils/logger';
-import type { AvailabilityInput, HeartbeatInput, RiderDataProvider, SosInput } from './types';
+import type { AvailabilityInput, HeartbeatInput, OtpChallenge, RiderDataProvider, SosInput } from './types';
 
 export type DemoScenarioId =
   | 'manual_offer'
@@ -110,7 +115,8 @@ export type DemoScenarioId =
   | 'version_conflict'
   | 'cash_limit'
   | 'suspended_rider'
-  | 'out_of_zone';
+  | 'out_of_zone'
+  | 'customer_no_whatsapp';
 
 export interface DemoScenario {
   id: DemoScenarioId;
@@ -136,6 +142,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
   { id: 'cash_limit', title: 'Cash Limit', description: 'Cash in hand is above the city limit; GO ONLINE is blocked.' },
   { id: 'suspended_rider', title: 'Suspended Rider', description: 'Account suspended; access restricted.' },
   { id: 'out_of_zone', title: 'Out-of-zone Rider', description: 'Rider is outside every zone; going online is refused.' },
+  { id: 'customer_no_whatsapp', title: 'Customer Not on WhatsApp', description: 'Delivery OTP and receipt go to the customer by SMS; see Messages below.' },
 ];
 
 interface DemoFlags {
@@ -146,6 +153,18 @@ interface DemoFlags {
   outOfZone?: boolean;
   forceAuto?: boolean;
   statusOverride?: RiderStatus;
+  /** The demo customer has no WhatsApp account → SMS fallback. */
+  customerNoWhatsApp?: boolean;
+}
+
+/** Simulated server-side messaging state (mirrors message_log / whatsapp_capability). */
+interface DemoMessagingState {
+  /** template:recipient → last WhatsApp send (resend escalation). */
+  lastWhatsApp: Record<string, string>;
+  /** template:recipient → send times (cooldown + rate limit). */
+  sends: Record<string, string[]>;
+  /** recipient → known not on WhatsApp. */
+  noWhatsApp: Record<string, boolean>;
 }
 
 interface StoredAsset {
@@ -190,6 +209,8 @@ interface DemoWorld {
   scenario: DemoScenarioId;
   flags: DemoFlags;
   sos: { at: string; jobId?: string; lat: number; lng: number }[];
+  outbox: DemoOutboxMessage[];
+  messaging: DemoMessagingState;
 }
 
 type Listener = (event: { type: 'offer' | 'job' | 'notification' | 'status' | 'world' }) => void;
@@ -225,6 +246,8 @@ const freshWorld = (phone: string | null): DemoWorld => ({
   scenario: 'manual_offer',
   flags: {},
   sos: [],
+  outbox: [],
+  messaging: { lastWhatsApp: {}, sends: {}, noWhatsApp: {} },
 });
 
 /** Seeds the returning demo rider (Rahul Sharma, approved Store Rider). */
@@ -264,7 +287,8 @@ export class LocalDemoProvider implements RiderDataProvider {
       const raw = await AsyncStorage.getItem(DEMO_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as DemoWorld;
-        if (parsed.v === 1) this.world = parsed;
+        // Worlds saved before messaging existed get the new fields.
+        if (parsed.v === 1) this.world = { ...parsed, outbox: parsed.outbox ?? [], messaging: parsed.messaging ?? { lastWhatsApp: {}, sends: {}, noWhatsApp: {} } };
       }
     } catch (e) {
       log.warn('demo world load failed', e);
@@ -305,7 +329,10 @@ export class LocalDemoProvider implements RiderDataProvider {
   async attachPhone(phone: string): Promise<void> {
     await this.ready;
     if (this.world.phone === phone && this.world.rider) return;
+    // The sign-in code was "sent" before the phone was attached; keep it in the dev outbox.
+    const outbox = this.world.outbox.filter((m) => m.template === 'login_otp');
     this.world = phone === DEMO_RETURNING_PHONE ? seedReturningRider(freshWorld(phone)) : freshWorld(phone);
+    this.world.outbox = outbox;
     this.touch('status');
   }
 
@@ -338,6 +365,7 @@ export class LocalDemoProvider implements RiderDataProvider {
     w.otpByJob = { ...DEMO_OTPS };
     w.ledger = w.ledger.filter((l) => l.note !== 'Demo: large COD batch');
     w.lastAcceptedOfferId = null;
+    w.messaging = { lastWhatsApp: {}, sends: {}, noWhatsApp: {} };
     if (w.rider) {
       w.rider = { ...w.rider, status: 'approved', statusReason: undefined, preferences: { ...w.rider.preferences, acceptance: 'manual' } };
       w.documents = w.documents.map((d) => ({ ...d, status: 'verified' }));
@@ -384,6 +412,9 @@ export class LocalDemoProvider implements RiderDataProvider {
         break;
       case 'out_of_zone':
         w.flags.outOfZone = true;
+        break;
+      case 'customer_no_whatsapp':
+        w.flags.customerNoWhatsApp = true;
         break;
       default:
         break;
@@ -584,7 +615,16 @@ export class LocalDemoProvider implements RiderDataProvider {
   async updateProfile(input: ProfileInput): Promise<Rider> {
     await this.ready;
     const r = this.requireRider();
-    this.world.rider = { ...r, fullName: input.fullName, emergencyPhone: input.emergencyPhone, language: input.language, photoAssetId: input.photoAssetId, photoUri: input.photoUri, updatedAt: iso() };
+    let email = r.email;
+    if (input.email !== undefined) {
+      if (input.email.trim() === '') email = undefined;
+      else {
+        const normalized = normalizeEmail(input.email);
+        if (!normalized) throw new ApiError({ code: 'validation', detail: 'Enter a valid email address', status: 400 });
+        email = normalized;
+      }
+    }
+    this.world.rider = { ...r, fullName: input.fullName, emergencyPhone: input.emergencyPhone, email, language: input.language, photoAssetId: input.photoAssetId, photoUri: input.photoUri, updatedAt: iso() };
     this.touch('status');
     return this.world.rider;
   }
@@ -744,6 +784,7 @@ export class LocalDemoProvider implements RiderDataProvider {
         w.documents = w.documents.map((d) => ({ ...d, status: 'verified', reviewedAt: iso() }));
         w.rider.tier = w.rider.tier ?? 'bronze';
         this.notify({ kind: 'system', title: "You're approved!", body: 'Welcome to OneLocal. Go online to receive your first order.', deepLink: '/home' });
+        this.messageRider('rider_approved', `${w.rider.fullName}: account approved`);
       }
       this.touch('status');
     }
@@ -949,7 +990,16 @@ export class LocalDemoProvider implements RiderDataProvider {
       if (d > GEOFENCE.arrivedFarM) job = { ...job, flags: [...(job.flags ?? []), `drop_arrival_far:${Math.round(d)}m`] };
     }
     w.jobs[job.id] = job;
-    const next = this.applyTransition(job, input.to, input.version, 'rider', { location: { lat: input.lat, lng: input.lng, accuracyM: input.accuracyM }, reason: input.reason });
+    let next = this.applyTransition(job, input.to, input.version, 'rider', { location: { lat: input.lat, lng: input.lng, accuracyM: input.accuracyM }, reason: input.reason });
+    // The package is on its way: the server sends the customer their delivery OTP.
+    if (input.to === 'picked_up') {
+      try {
+        next = this.sendDeliveryOtp(next, false);
+      } catch (e) {
+        // Messaging never blocks the delivery flow; the rider can resend from the OTP screen.
+        log.warn('delivery OTP send failed', e);
+      }
+    }
     this.touch('job');
     return next;
   }
@@ -1041,6 +1091,15 @@ export class LocalDemoProvider implements RiderDataProvider {
     }
     w.currentJobId = null;
     delete w.waits[id];
+    this.sendDemoMessage({
+      template: 'order_delivered',
+      audience: 'customer',
+      recipientKey: `customer:${id}`,
+      policy: 'whatsapp_then_sms',
+      hasWhatsApp: !w.flags.customerNoWhatsApp,
+      toMasked: job.drop.customerFirstName ?? 'Customer',
+      summary: `Order ${job.orderRef} delivered at ${new Date().toTimeString().slice(0, 5)}`,
+    });
     this.notify({ kind: 'payment_disbursed', title: `₹${earnings.total} added for ${job.orderRef}`, body: `Base ₹${earnings.base} + distance ₹${earnings.distance}${earnings.peak ? ` + peak ₹${earnings.peak}` : ''}${earnings.tip ? ` + tip ₹${earnings.tip}` : ''}`, deepLink: `/earnings/job/${id}` });
     if (w.online) this.scheduleNextDispatch(6);
     this.touch('job');
@@ -1135,11 +1194,153 @@ export class LocalDemoProvider implements RiderDataProvider {
     return { exception: ex, jobState: job.state, nextActions: outcome === 'continue' ? ['continue'] : ['return_to_store'] };
   }
 
-  async sos(input: SosInput): Promise<void> {
+  async sos(input: SosInput): Promise<SosResult> {
     await this.ready;
     this.world.sos.push({ at: iso(), jobId: input.jobId, lat: input.lat, lng: input.lng });
     this.notify({ kind: 'system', title: 'SOS received', body: 'Operations have been alerted and can see your live location. Stay where it is safe.', deepLink: input.jobId ? `/job/${input.jobId}/sos` : '/home' });
+    const contact = this.world.rider?.emergencyPhone;
+    // The emergency contact gets WhatsApp and SMS together, with a map link to the rider.
+    const contactAlert = contact
+      ? this.sendDemoMessage({
+          template: 'sos_alert',
+          audience: 'emergency_contact',
+          recipientKey: `phone:${contact}`,
+          policy: 'whatsapp_and_sms',
+          hasWhatsApp: demoHasWhatsApp(contact),
+          toMasked: maskPhoneForDisplay(contact),
+          summary: `SOS from ${this.world.rider?.fullName ?? 'rider'} · maps.google.com/?q=${input.lat.toFixed(5)},${input.lng.toFixed(5)}`,
+        })
+      : null;
     this.touch('notification');
+    return { contactAlert };
+  }
+
+  async resendDeliveryOtp(id: string): Promise<MessageReceipt> {
+    await this.ready;
+    this.requireApproved();
+    const job = this.requireJob(id);
+    const allowed: JobState[] = ['picked_up', 'to_drop', 'at_drop', 'handover', 'proof'];
+    if (!allowed.includes(job.state)) throw new ApiError({ code: 'invalid_transition', detail: 'The customer code can be resent once the package is picked up', status: 409 });
+    if (job.otpLocked) throw new ApiError({ code: 'otp_locked', detail: 'OTP is locked after 5 wrong attempts. Use photo proof.', status: 423 });
+    const next = this.sendDeliveryOtp(job, true);
+    this.touch('job');
+    return next.otpDelivery!;
+  }
+
+  async emailStatement(week: string): Promise<MessageReceipt> {
+    await this.ready;
+    const rider = this.requireRider();
+    const email = normalizeEmail(rider.email);
+    if (!email) throw new ApiError({ code: 'validation', detail: 'Add your email in Profile to receive statements.', status: 400 });
+    this.rateLimit(`weekly_statement:${email}`, 3);
+    const receipt = this.sendDemoMessage({ template: 'weekly_statement', audience: 'rider', recipientKey: `email:${email}`, policy: 'email', hasWhatsApp: false, toMasked: maskEmailForDisplay(email), summary: `Statement ${week} (PDF link)` });
+    this.touch('notification');
+    return receipt;
+  }
+
+  /** Dev screen: messages the simulated server sent (newest first). */
+  async getDemoOutbox(): Promise<DemoOutboxMessage[]> {
+    await this.ready;
+    return clone(this.world.outbox);
+  }
+
+  async clearDemoOutbox(): Promise<void> {
+    await this.ready;
+    this.world.outbox = [];
+    this.touch('world');
+  }
+
+  /** The demo auth provider reports sign-in codes here so they show up in the outbox. */
+  async recordLoginOtp(challenge: OtpChallenge): Promise<void> {
+    await this.ready;
+    const channel = challenge.delivery?.channel === 'sms' ? 'sms' : 'whatsapp';
+    this.world.outbox.unshift({ id: newId('msg'), template: 'login_otp', audience: 'rider', channel, fallbackUsed: channel === 'sms', fallbackReason: challenge.delivery?.fallbackReason, toMasked: maskPhoneForDisplay(challenge.phone), summary: `Sign-in code ${challenge.demoCode ?? ''}`.trim(), at: iso() });
+    this.world.outbox = this.world.outbox.slice(0, 40);
+    this.touch('world');
+  }
+
+  /** Cooldown + per-window cap, like the server's OTP rate limit. */
+  private rateLimit(key: string, max: number = MESSAGING.otpMaxPerWindow) {
+    const ms = this.world.messaging;
+    const now = Date.now();
+    const recent = (ms.sends[key] ?? []).filter((t) => now - Date.parse(t) < MESSAGING.otpWindowSeconds * 1000);
+    const last = recent[recent.length - 1];
+    if (last && now - Date.parse(last) < MESSAGING.resendCooldownSeconds * 1000) {
+      const wait = Math.ceil((MESSAGING.resendCooldownSeconds * 1000 - (now - Date.parse(last))) / 1000);
+      throw new ApiError({ code: 'rate_limited', detail: `Wait ${wait} s before sending again`, status: 429, meta: { retryAfterSeconds: wait } });
+    }
+    if (recent.length >= max) throw new ApiError({ code: 'rate_limited', detail: 'Too many messages. Try again in a few minutes.', status: 429 });
+    ms.sends[key] = [...recent, iso()];
+  }
+
+  private sendDeliveryOtp(job: Job, resend: boolean): Job {
+    const w = this.world;
+    this.rateLimit(`delivery_otp:${job.id}`);
+    const otp = w.otpByJob[job.id] ?? '0000';
+    const receipt = this.sendDemoMessage({
+      template: 'delivery_otp',
+      audience: 'customer',
+      recipientKey: `customer:${job.id}`,
+      policy: 'whatsapp_then_sms',
+      hasWhatsApp: !w.flags.customerNoWhatsApp,
+      toMasked: job.drop.customerFirstName ?? 'Customer',
+      summary: `Delivery OTP ${otp} for ${job.orderRef}`,
+      resend,
+    });
+    const next = { ...job, otpDelivery: receipt };
+    w.jobs[job.id] = next;
+    return next;
+  }
+
+  private messageRider(template: 'rider_approved', summary: string) {
+    const w = this.world;
+    const phone = w.phone ?? w.rider?.phone;
+    if (phone) {
+      this.sendDemoMessage({ template, audience: 'rider', recipientKey: `phone:${phone}`, policy: 'whatsapp_then_sms', hasWhatsApp: demoHasWhatsApp(phone), toMasked: maskPhoneForDisplay(phone), summary });
+    }
+    const email = normalizeEmail(w.rider?.email);
+    if (email) this.sendDemoMessage({ template, audience: 'rider', recipientKey: `email:${email}`, policy: 'email', hasWhatsApp: false, toMasked: maskEmailForDisplay(email), summary });
+  }
+
+  /** Same routing as the server orchestrator; records what was "sent" in the outbox. */
+  private sendDemoMessage(m: {
+    template: DemoOutboxMessage['template'];
+    audience: MessageAudience;
+    recipientKey: string;
+    policy: MessagePolicy;
+    hasWhatsApp: boolean;
+    toMasked: string;
+    summary: string;
+    resend?: boolean;
+  }): MessageReceipt {
+    const w = this.world;
+    const ms = w.messaging;
+    const key = `${m.template}:${m.recipientKey}`;
+    const last = ms.lastWhatsApp[key];
+    const route = routeMessage({
+      policy: m.policy,
+      hasWhatsApp: m.hasWhatsApp,
+      knownNoWhatsApp: m.policy === 'whatsapp_then_sms' && ms.noWhatsApp[m.recipientKey] === true,
+      recentWhatsAppSend: !!m.resend && !!last && Date.now() - Date.parse(last) < MESSAGING.resendEscalationSeconds * 1000,
+    });
+    if (route.fallbackReason === 'no_whatsapp') ms.noWhatsApp[m.recipientKey] = true;
+    if (route.channels.includes('whatsapp')) ms.lastWhatsApp[key] = iso();
+    for (const channel of route.channels) {
+      const isFallback = channel === 'sms' && route.fallbackUsed;
+      w.outbox.unshift({ id: newId('msg'), template: m.template, audience: m.audience, channel, fallbackUsed: isFallback, fallbackReason: isFallback ? route.fallbackReason : undefined, toMasked: m.toMasked, summary: m.summary, at: iso() });
+    }
+    w.outbox = w.outbox.slice(0, 40);
+    return {
+      channel: route.primary,
+      status: 'sent',
+      fallbackUsed: route.fallbackUsed,
+      fallbackReason: route.fallbackReason,
+      fallbackPending: route.primary === 'whatsapp' && m.policy === 'whatsapp_then_sms',
+      // The rider never sees a customer's number, not even masked.
+      toMasked: m.audience === 'customer' ? undefined : m.toMasked,
+      sentAt: iso(),
+      resendAfterSeconds: MESSAGING.resendCooldownSeconds,
+    };
   }
 
   async getCallNumber(id: string): Promise<{ number: string }> {

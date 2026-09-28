@@ -10,6 +10,7 @@ import { isDevBuild, isLocalDemo } from '@/config/env';
 import { DEMO_RIDER_CODE } from '@/demo/constants';
 import type { RiderStatus } from '@/types';
 import { describePayout, usePayoutMethod } from '@/features/profile/payout';
+import { EmailSheet } from '@/features/profile/EmailSheet';
 import { documentPill, DOCUMENT_LABELS, formatPhoneDisplay, kycSummary, RIDER_TYPE_LABELS, sortDocuments, STATUS_LABELS, VEHICLE_CLASS_LABELS, type DocPillTone } from '@/features/profile/documents';
 
 const PILL_COLORS: Record<DocPillTone, { bg: string; fg: string }> = {
@@ -53,6 +54,7 @@ export default function ProfileScreen() {
   const rider = data?.rider ?? null;
   const payout = usePayoutMethod(rider);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [emailSheet, setEmailSheet] = useState(false);
 
   if (isLoading && !data) {
     return (
@@ -208,12 +210,19 @@ export default function ProfileScreen() {
         <View style={styles.actions}>
           <ActionRow label="Emergency SOS Protocol" icon="shield-alert" iconColor={colors.danger} onPress={() => router.push('/sos' as never)} />
           <ActionRow label="Help & Support Ticket Center" icon="help-circle" onPress={() => router.push('/support' as never)} />
+          <ActionRow
+            label={rider.email ? `Email · ${rider.email}` : 'Add email for statements'}
+            icon="mail"
+            onPress={() => setEmailSheet(true)}
+          />
           <ActionRow label="Documents" icon="file-text" onPress={() => router.push('/onboarding/kyc' as never)} />
           <ActionRow label="Account status" icon="chevron-right" iconColor={colors.textMuted} onPress={() => router.push('/status' as never)} trailing={<StatusChip label={STATUS_LABELS[rider.status]} tone={STATUS_TONE[rider.status]} size="sm" />} />
           {isDevBuild ? <ActionRow label="Developer scenarios" icon="settings" onPress={() => router.push('/dev/scenarios' as never)} /> : null}
           <ActionRow label="Sign out" icon="log-out" iconColor={colors.danger} onPress={() => setConfirmSignOut(true)} />
         </View>
       </View>
+
+      {emailSheet ? <EmailSheet rider={rider} visible={emailSheet} onClose={() => setEmailSheet(false)} /> : null}
 
       <ConfirmationSheet
         visible={confirmSignOut}

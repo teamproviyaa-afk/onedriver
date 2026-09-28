@@ -1,4 +1,5 @@
 export { AppHeader } from './AppHeader';
+export * from './MessageDeliveryNote';
 export { ConnectivityBanner, ConnectivityBadge, CONNECTIVITY_COPY } from './ConnectivityBanner';
 export { ActiveJobBar } from './ActiveJobBar';
 export { BottomTabBar } from './BottomTabBar';

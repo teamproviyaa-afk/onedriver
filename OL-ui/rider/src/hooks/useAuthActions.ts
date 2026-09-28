@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 
 import { ApiError } from '@/types';
 import { getAuthProvider, getDataProvider, getDemoProvider } from '@/providers';
-import type { OtpChallenge } from '@/providers/types';
+import type { OtpChallenge, SendOtpOptions } from '@/providers/types';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useDeliveryStore } from '@/stores/useDeliveryStore';
 import { useOnboardingStore, nextOnboardingRoute } from '@/stores/useOnboardingStore';
@@ -19,12 +19,14 @@ export const useAuthActions = () => {
   const [error, setError] = useState<string | null>(null);
 
   const sendOtp = useCallback(
-    async (phone: string): Promise<OtpChallenge | null> => {
+    async (phone: string, options?: SendOtpOptions): Promise<OtpChallenge | null> => {
       setBusy(true);
       setError(null);
       try {
-        const c = await getAuthProvider().sendOtp(phone);
+        const c = await getAuthProvider().sendOtp(phone, options);
         auth.setPendingPhone(c.phone);
+        auth.setOtpDelivery(c.delivery ?? null);
+        void getDemoProvider()?.recordLoginOtp(c);
         return c;
       } catch (e) {
         setError(ApiError.is(e) ? e.detail : 'Could not send the OTP. Try again.');

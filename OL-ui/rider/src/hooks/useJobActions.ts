@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
-import { ApiError, type ExceptionInput, type ExceptionKind, type ExceptionResponse, type Job, type PickupVerifyInput, type PickupVerifyResult, type ProofInput, type ProofResult, type StepTarget } from '@/types';
+import { ApiError, type ExceptionInput, type ExceptionKind, type ExceptionResponse, type Job, type PickupVerifyInput, type PickupVerifyResult, type ProofInput, type ProofResult, type StepTarget, type MessageReceipt, type SosResult } from '@/types';
 import { getDataProvider } from '@/providers';
 import { transition, tryTransition } from '@/state-machine/deliveryStateMachine';
 import { buildQueueItem, runOrQueue } from '@/offline/queueEngine';
@@ -163,17 +163,31 @@ export const useJobActions = () => {
     [qc, refreshFromServer, setJob],
   );
 
-  const sos = useCallback(async (jobId?: string): Promise<void> => {
+  /** Sends SOS (queued when offline). Returns how the emergency contact was alerted, or null when queued. */
+  const sos = useCallback(async (jobId?: string): Promise<SosResult | null> => {
     const p = useDeliveryStore.getState().position;
     const item = buildQueueItem('sos', jobId ?? 'none', 'send', { jobId, lat: p?.lat ?? 0, lng: p?.lng ?? 0 });
-    await runOrQueue(item);
+    const res = await runOrQueue<typeof item.payload, SosResult | undefined>(item);
     void qc.invalidateQueries({ queryKey: queryKeys.notifications });
+    return res.queued ? null : (res.value ?? { contactAlert: null });
   }, [qc]);
+
+  /** Asks the server to re-send the customer's delivery OTP (WhatsApp → SMS). Needs a connection. */
+  const resendDeliveryOtp = useCallback(
+    async (job: Job): Promise<MessageReceipt> => {
+      const receipt = await getDataProvider().resendDeliveryOtp(job.id);
+      const current = useDeliveryStore.getState().job;
+      if (current?.id === job.id) setJob({ ...current, otpDelivery: receipt }, { pendingSync: useDeliveryStore.getState().pendingSync });
+      invalidate(job.id);
+      return receipt;
+    },
+    [invalidate, setJob],
+  );
 
   const callCustomer = useCallback(async (job: Job): Promise<string> => {
     const r = await getDataProvider().getCallNumber(job.id);
     return r.number;
   }, []);
 
-  return { step, verifyPickup, submitProof, raiseException, resolveWait, sos, callCustomer, refreshFromServer };
+  return { step, verifyPickup, submitProof, raiseException, resolveWait, sos, resendDeliveryOtp, callCustomer, refreshFromServer };
 };

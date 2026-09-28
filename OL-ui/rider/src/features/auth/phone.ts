@@ -58,9 +58,18 @@ export type RegisterFormOutput = z.output<typeof registerSchema>;
 
 export const signInSchema = z.object({ phone: phoneSchema });
 
+/** Optional email for statements, payout and approval emails. */
+export const optionalEmailSchema = z
+  .string()
+  .trim()
+  .max(254, 'Email is too long')
+  .refine((v) => v === '' || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v), 'Enter a valid email address')
+  .transform((v) => v.toLowerCase());
+
 export const profileSchema = z.object({
   fullName: fullNameSchema,
   emergencyPhone: phoneSchema,
+  email: optionalEmailSchema,
   language: z.enum(['en', 'hi', 'mr', 'kn']),
 });
 

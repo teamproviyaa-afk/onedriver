@@ -41,6 +41,7 @@ export interface JobDto {
   merchant_note?: string;
   otp_attempts?: number;
   otp_locked?: boolean;
+  otp_delivery?: MessageReceiptDto;
   rider_id?: string;
   accepted_at?: string;
   delivered_at?: string;
@@ -73,6 +74,7 @@ export interface RiderDto {
   full_name: string;
   photo_asset_id?: string;
   emergency_phone?: string;
+  email?: string;
   language?: string;
   type: string;
   status: string;
@@ -146,4 +148,20 @@ export interface NotificationDto {
 export interface ErrorDto {
   detail: string;
   code: string;
+}
+
+/** Response of the messaging endpoints (otp/resend, statements/:week/email, sos). */
+export interface MessageReceiptDto {
+  channel: 'whatsapp' | 'sms' | 'email' | null;
+  status: 'sent' | 'failed' | 'skipped';
+  fallback_used: boolean;
+  fallback_reason?: string;
+  fallback_pending?: boolean;
+  to_masked?: string;
+  sent_at: string;
+  resend_after_seconds?: number;
+}
+
+export interface SosResultDto {
+  contact_alert?: MessageReceiptDto | null;
 }

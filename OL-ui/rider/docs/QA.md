@@ -41,3 +41,23 @@ Driven end to end in a fresh browser profile with `DATA_MODE=local_demo`; every 
 | Photo proof | same journey up to the method sheet → Photo Proof (preselected for the contactless drop) → CONFIRM METHOD → CAPTURE (reference image on web) → SUBMIT PHOTO → Delivered → home | see `scratchpad` run log |
 
 Defects found and fixed by this run: Tasks tab crashed with "Invalid hook call" (`renderSectionFooter` was given a compiled component instead of a render function); photo proof on web threw `Image.resolveAssetSource is not a function` (now `expo-asset`); today's demo history used fixed clock times that sorted into the future early in the day (now relative to now); expo-haptics vibrate warning on web (haptics skipped on web).
+
+## Messaging (WhatsApp → SMS, email)
+
+Automated: `supabase/tests` (43 node:test tests — every fallback path, provider request formats,
+Meta/Twilio/Standard-Webhooks signatures incl. the reference vector, routes, store queries, privacy)
+and `src/__tests__/messaging.test.ts` (routing rules, demo sign-in code, delivery OTP at pickup,
+resend cooldown → SMS, customer without WhatsApp, email statement, SOS contact alert, dev outbox).
+
+Headless web run (`DATA_MODE=local_demo`), 15/15 steps, 0 console errors:
+sign in `9876543210` → "Code sent on WhatsApp" → *Resend by SMS* → "Code sent by SMS" → home →
+Dev scenario *Customer Not on WhatsApp* → offer #9830 → pickup → drop → Secure OTP screen reads
+"shared with Amit by SMS (not on WhatsApp)" → *Resend by SMS* (stays on the screen, 30 s cooldown) →
+OTP `4821` → delivered → Profile: add email → Weekly statement: *Email me this statement* →
+"Statement sent to r***@example.com" → Dev → Messages sent lists every message with its channel.
+
+Defects found and fixed by these runs: a job update that did not change the state (the resent code)
+made a hidden earlier screen in the stack redirect the rider to the method picker — job-screen
+redirects now run only on the focused screen and only when the state changes; the dev outbox read
+the demo world before it had loaded and lost the sign-in code when the phone was attached.
+Note: in this sandbox Metro does not pick up file edits — restart it with `--clear` after changes.

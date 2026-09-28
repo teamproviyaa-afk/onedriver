@@ -11,12 +11,20 @@ import { useJob, useJobActions } from '@/hooks';
 import { openDialer } from '@/navigation/openNavigation';
 import { canRaiseException, routeForJob, STATE_LABELS } from '@/state-machine/deliveryStateMachine';
 import { useDeliveryStore, selectPosition } from '@/stores';
-import { ApiError, type RiderFlowState } from '@/types';
+import { ApiError, type RiderFlowState, type SosResult } from '@/types';
 import { formatClock } from '@/utils/format';
 import { RIDER_HELPLINE } from '@/features/issues/issueOptions';
 import { IssueHeader } from '@/features/issues/IssueHeader';
 
 const TITLE = 'Safety Assistance';
+
+/** Confirms who was alerted; the emergency contact gets WhatsApp and SMS together. */
+const sosToast = (result: SosResult | null): string => {
+  if (!result) return 'SOS saved · it will be sent as soon as you are back online';
+  const alert = result.contactAlert;
+  if (alert?.status === 'sent') return `Operations and your emergency contact alerted (${alert.channel === 'whatsapp' ? 'WhatsApp + SMS' : 'SMS'})`;
+  return 'Operations alerted · live location shared';
+};
 const HOLD_MS = 3000;
 
 const haptic = async (kind: 'start' | 'sent' | 'cancel') => {
@@ -68,7 +76,7 @@ export default function SafetyScreen() {
     if (!job || busy) return;
     setBusy('sos');
     try {
-      await sos(job.id);
+      const result = await sos(job.id);
       if (canRaiseException(job.state, 'safety')) {
         try {
           await raiseException(job, 'safety');
@@ -80,7 +88,7 @@ export default function SafetyScreen() {
       setSentAt(new Date().toISOString());
       setConfirmOpen(false);
       void haptic('sent');
-      toast.success('Operations alerted · live location shared');
+      toast.success(sosToast(result));
     } catch (e) {
       toast.error(ApiError.is(e) ? e.detail : 'Could not send the SOS. Call the helpline.');
     } finally {

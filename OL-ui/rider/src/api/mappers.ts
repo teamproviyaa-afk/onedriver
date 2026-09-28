@@ -1,4 +1,6 @@
 import type {
+  MessageFallbackReason,
+  MessageReceipt,
   DeliveryCategory,
   EarningsSummary,
   GeoZone,
@@ -15,7 +17,7 @@ import type {
   RiderNotification,
   StoreLink,
 } from '@/types';
-import type { EarningsDto, JobDto, JobEarningsDto, MeDto, NotificationDto, OfferDto, RiderDto } from './dto';
+import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, RiderDto } from './dto';
 
 const asCategory = (c: string): DeliveryCategory =>
   c === 'quick_drop' || c === 'pick_drop' ? c : 'on_order';
@@ -67,6 +69,7 @@ export const mapJob = (d: JobDto): Job => ({
   merchantNote: d.merchant_note,
   otpAttempts: d.otp_attempts ?? 0,
   otpLocked: d.otp_locked ?? false,
+  otpDelivery: d.otp_delivery ? mapMessageReceipt(d.otp_delivery) : undefined,
   riderId: d.rider_id,
   acceptedAt: d.accepted_at,
   deliveredAt: d.delivered_at,
@@ -100,6 +103,7 @@ export const mapRider = (d: RiderDto): Rider => ({
   fullName: d.full_name,
   photoAssetId: d.photo_asset_id,
   emergencyPhone: d.emergency_phone,
+  email: d.email,
   language: (d.language as Rider['language']) ?? 'en',
   type: d.type as Rider['type'],
   status: d.status as Rider['status'],
@@ -217,4 +221,15 @@ export const mapNotification = (d: NotificationDto): RiderNotification => ({
   readAt: d.read_at ?? null,
   deepLink: typeof d.data?.deep_link === 'string' ? d.data.deep_link : undefined,
   data: d.data,
+});
+
+export const mapMessageReceipt = (d: MessageReceiptDto): MessageReceipt => ({
+  channel: d.channel,
+  status: d.status,
+  fallbackUsed: d.fallback_used,
+  fallbackReason: d.fallback_reason as MessageFallbackReason | undefined,
+  fallbackPending: d.fallback_pending ?? false,
+  toMasked: d.to_masked,
+  sentAt: d.sent_at,
+  resendAfterSeconds: d.resend_after_seconds,
 });

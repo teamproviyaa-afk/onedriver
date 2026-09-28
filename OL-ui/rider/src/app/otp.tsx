@@ -3,6 +3,8 @@ import { Animated, Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { AppText, ErrorState, GhostButton, PrimaryButton, Screen, Spacer } from '@/components/ui';
+import { MessageDeliveryNote } from '@/components/app';
+import type { OtpDelivery } from '@/types';
 import { spacing } from '@/theme';
 import { useAuthActions } from '@/hooks/useAuthActions';
 import { useCountdown } from '@/hooks/useCountdown';
@@ -16,6 +18,15 @@ import { OtpBoxes } from '@/features/auth/OtpBoxes';
 import { formatPhoneWithCode } from '@/features/auth/phone';
 
 const INCOMPLETE_ERROR = `Enter the ${OTP.loginLength}-digit OTP sent to your phone`;
+
+/** How the code reached the rider: WhatsApp first, SMS when the number is not on WhatsApp or on resend. */
+const deliveryText = (d: OtpDelivery | null): string | null => {
+  if (!d) return null;
+  if (d.channel === 'whatsapp') return 'Code sent on WhatsApp';
+  if (d.channel === 'unknown') return "Code sent on WhatsApp, or by SMS if this number isn't on WhatsApp";
+  if (d.fallbackReason === 'no_whatsapp' || d.fallbackReason === 'known_no_whatsapp') return "Code sent by SMS · this number isn't on WhatsApp";
+  return 'Code sent by SMS';
+};
 const LOCKED_ERROR = 'Too many wrong attempts. Request a new OTP to continue.';
 
 /**
@@ -24,6 +35,7 @@ const LOCKED_ERROR = 'Too many wrong attempts. Request a new OTP to continue.';
  */
 export default function OtpScreen() {
   const phone = useAuthStore((s) => s.pendingPhone);
+  const delivery = useAuthStore((s) => s.otpDelivery);
   const { busy, sendOtp, verifyOtp } = useAuthActions();
 
   const [code, setCode] = useState('');
@@ -91,7 +103,8 @@ export default function OtpScreen() {
     setResending(true);
     setError(null);
     try {
-      const challenge = await sendOtp(phone);
+      // A resend goes by SMS: the rider did not get the WhatsApp message.
+      const challenge = await sendOtp(phone, { resend: true });
       if (challenge) {
         setLocked(false);
         setCode('');
@@ -145,6 +158,7 @@ export default function OtpScreen() {
             </AppText>
           </Pressable>
         </View>
+        {deliveryText(delivery) ? <MessageDeliveryNote channel={delivery?.channel ?? null} text={deliveryText(delivery) ?? ''} /> : null}
       </View>
 
       <Spacer size={spacing.x8l} />
@@ -171,7 +185,7 @@ export default function OtpScreen() {
             <AppText variant="bodyLg" color="textSecondary" style={styles.timerText}>
               {locked ? 'Request a new code to continue' : "Didn't get the code?"}
             </AppText>
-            <GhostButton label={resending ? 'Sending…' : 'Resend OTP'} onPress={() => void resend()} disabled={resending || busy} underline />
+            <GhostButton label={resending ? 'Sending…' : 'Resend by SMS'} onPress={() => void resend()} disabled={resending || busy} underline />
           </>
         ) : (
           <>

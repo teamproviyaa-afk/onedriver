@@ -20,6 +20,7 @@ export type ApiErrorCode =
   | 'network'
   | 'coming_soon'
   | 'validation'
+  | 'rate_limited'
   | 'unknown';
 
 export interface ApiErrorShape {
