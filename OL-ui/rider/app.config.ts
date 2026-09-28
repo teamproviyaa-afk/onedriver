@@ -1,11 +1,32 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+import { withAndroidManifest, type ConfigPlugin } from 'expo/config-plugins';
+
+/**
+ * Android 11+ package visibility: without a <queries> entry Linking.canOpenURL() cannot see
+ * Google Maps' turn-by-turn scheme, and the navigation hand-off would drop to the web link.
+ */
+const withNavigationQueries: ConfigPlugin = (cfg) =>
+  withAndroidManifest(cfg, (c) => {
+    const manifest = c.modResults.manifest;
+    const queries = manifest.queries ?? [];
+    if (queries.length === 0) queries.push({});
+    const query = queries[0]!;
+    const intents = query.intent ?? [];
+    const scheme = 'google.navigation';
+    if (!intents.some((i) => i.data?.some((d) => d.$?.['android:scheme'] === scheme))) {
+      intents.push({ action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }], data: [{ $: { 'android:scheme': scheme } }] });
+    }
+    query.intent = intents;
+    manifest.queries = queries;
+    return c;
+  });
 
 /**
  * OneLocal Rider (OnLatur Rider) — Expo app config.
  * Native behaviour is configured here and through config plugins only
  * (Continuous Native Generation: never edit ios/ or android/ by hand).
  */
-export default ({ config }: ConfigContext): ExpoConfig => ({
+const appConfig = ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'OneLocal Rider',
   slug: 'onelocal-rider',
@@ -25,6 +46,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSCameraUsageDescription:
         'The camera is used to scan pickup QR codes, capture delivery photo proof and upload KYC documents.',
       UIBackgroundModes: ['location'],
+      // Lets Linking.canOpenURL() find Google Maps / Apple Maps for the navigation hand-off.
+      LSApplicationQueriesSchemes: ['comgooglemaps', 'maps'],
       ITSAppUsesNonExemptEncryption: false,
     },
   },
@@ -75,6 +98,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           'OneLocal Rider shares your live location with the customer only while you are on an active delivery.',
         isAndroidForegroundServiceEnabled: true,
         isAndroidBackgroundLocationEnabled: false,
+        isIosBackgroundLocationEnabled: true,
       },
     ],
     [
@@ -90,6 +114,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         cameraPermission:
           'The camera is used to scan pickup QR codes, capture delivery photo proof and upload KYC documents.',
         recordAudioAndroid: false,
+        microphonePermission: false,
       },
     ],
     'expo-secure-store',
@@ -120,3 +145,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     eas: { ...(config.extra?.eas as Record<string, unknown> | undefined) },
   },
 });
+
+export default (ctx: ConfigContext): ExpoConfig => withNavigationQueries(appConfig(ctx));

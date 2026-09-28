@@ -1,9 +1,43 @@
 {
-  "cli": { "version": ">= 12.0.0", "appVersionSource": "local" },
-  "build": {
-    "development": { "developmentClient": true, "distribution": "internal", "env": { "APP_ENV": "local", "DATA_MODE": "local_demo" } },
-    "preview": { "distribution": "internal", "android": { "buildType": "apk" }, "env": { "APP_ENV": "local", "DATA_MODE": "local_demo" } },
-    "production": { "env": { "APP_ENV": "production", "DATA_MODE": "api" } }
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
   },
-  "submit": { "production": {} }
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "local",
+        "DATA_MODE": "local_demo"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "local",
+        "DATA_MODE": "local_demo"
+      }
+    },
+    "preview-simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "production": {
+      "environment": "production",
+      "env": {
+        "APP_ENV": "production",
+        "DATA_MODE": "api"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
 }

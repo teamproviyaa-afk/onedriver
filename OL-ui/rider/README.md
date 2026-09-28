@@ -20,20 +20,27 @@ npm run lint              # expo lint
 npx expo export --platform android   # native Hermes bundle for the Android app (not viewable in a browser)
 ```
 
-### Build an installable APK
+### Build for Android and iOS (EAS)
 
-The demo APK runs fully offline on the built-in demo data (`DATA_MODE=local_demo`) and keeps the DEV · SCENARIOS switcher; `APP_ENV=production` builds never show it.
+Run from `OL-ui/rider` after `npx eas-cli@latest login`. On the first build EAS asks to create a project (answer **Yes**; it saves `extra.eas.projectId` into `app.json`) and to create signing credentials (answer **Yes**). Demo builds (`preview*`) run fully offline on the built-in demo data and keep the DEV · SCENARIOS switcher; `production` never shows it.
 
-**EAS cloud build** (no Android SDK needed; free Expo account):
+| Goal | Command | Needs |
+|---|---|---|
+| Android APK to sideload | `npx eas-cli@latest build -p android --profile preview` | free Expo account |
+| iOS app in the Mac's iOS Simulator | `npx eas-cli@latest build -p ios --profile preview-simulator` | Xcode (Simulator) on the Mac |
+| iOS app on a real iPhone | `npx eas-cli@latest device:create`, then `npx eas-cli@latest build -p ios --profile preview` | Apple Developer Program |
+| Google Play (AAB) | `npx eas-cli@latest build -p android --profile production`, then `npx eas-cli@latest submit -p android` | Google Play Console + service account key |
+| App Store / TestFlight | `npx eas-cli@latest build -p ios --profile production`, then `npx eas-cli@latest submit -p ios` | Apple Developer Program + App Store Connect app |
+
+The `production` profile expects the One Local server (`PROVIYAA_API_BASE_URL`); publish demo builds only to internal testing.
+
+**Maps.** iOS uses Apple Maps and needs no key. Android shows the built-in map drawing until a Google Maps key is provided: create an Android-restricted key for `com.onelocal.rider` (Maps SDK for Android) and store it in EAS, never in git:
 
 ```bash
-npx eas-cli@latest login
-npx eas-cli@latest build --platform android --profile preview   # eas.json → buildType "apk"
+npx eas-cli@latest env:create --name GOOGLE_MAPS_ANDROID_API_KEY --value <key> --environment preview --environment production --visibility sensitive
 ```
 
-On the first build EAS asks to create a project (answer **Yes**; it saves `extra.eas.projectId` into `app.json`) and to generate an Android keystore (answer **Yes**). EAS prints a download link and QR code for the `.apk` when the build finishes.
-
-**Local build** (Android Studio with SDK 36 + NDK 27.1, JDK 17, `ANDROID_HOME` set):
+**Local Android build** (Android Studio with SDK 36 + NDK 27.1, JDK 17, `ANDROID_HOME` set):
 
 ```bash
 npx expo prebuild --platform android --clean     # generates android/ from app.config.ts (not committed)
@@ -41,7 +48,7 @@ cd android && ./gradlew assembleRelease
 # → android/app/build/outputs/apk/release/app-release.apk (signed with the debug key, for sideloading)
 ```
 
-`npx expo run:android --variant release` builds the same APK and installs it on a connected phone or emulator.
+**Local iOS build** (Xcode on a Mac): `npx expo run:ios --configuration Release` builds and launches it in the Simulator or on a connected iPhone.
 
 ### Preview a static build in a browser
 

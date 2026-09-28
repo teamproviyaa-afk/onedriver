@@ -20,8 +20,8 @@ const toPosition = (loc: Location.LocationObject): RiderPosition => ({
   recordedAt: new Date(loc.timestamp).toISOString(),
 });
 
-// Background task for the Android foreground service during an active job.
-// Defined at module scope as required by expo-task-manager.
+// Background task for an active job: Android foreground service / iOS background
+// location session. Defined at module scope as required by expo-task-manager.
 try {
   TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     if (error) {
@@ -82,7 +82,8 @@ let currentMode: TrackingMode = 'off';
  * Applies the tracking cadence for a mode (spec §3.4):
  *  - off: nothing
  *  - heartbeat: coarse position every 30 s
- *  - job_moving / job_stationary: 5 s / 25 m or 30 s, Android foreground service while on a job.
+ *  - job_moving / job_stationary: 5 s / 25 m or 30 s, kept alive while the rider is in the
+ *    maps app: Android foreground service, iOS background session (blue location pill).
  */
 export const applyDeviceTrackingMode = async (mode: TrackingMode): Promise<void> => {
   if (mode === currentMode) return;
@@ -93,24 +94,30 @@ export const applyDeviceTrackingMode = async (mode: TrackingMode): Promise<void>
   if (perm !== 'granted') return;
   const cadence = cadenceFor(mode);
   const onJob = mode === 'job_moving' || mode === 'job_stationary';
-  if (onJob && Platform.OS === 'android') {
+  if (onJob && (Platform.OS === 'android' || Platform.OS === 'ios')) {
     try {
       await Location.startLocationUpdatesAsync(LOCATION_TASK, {
         accuracy: Location.Accuracy.High,
         timeInterval: cadence.timeIntervalMs,
         distanceInterval: cadence.distanceIntervalM,
+        // Android: foreground service with a persistent notification.
         foregroundService: {
           notificationTitle: 'OneLocal Rider',
           notificationBody: 'Sharing your location for the active delivery',
           notificationColor: '#76EC00',
           killServiceOnDestroy: true,
         },
+        // iOS: started in the foreground with while-in-use permission, the session keeps
+        // running while the rider navigates in Maps and shows the blue location indicator.
+        activityType: Location.ActivityType.AutomotiveNavigation,
+        pausesUpdatesAutomatically: false,
+        showsBackgroundLocationIndicator: true,
       });
       serviceRunning = true;
       return;
     } catch (e) {
-      // Expo Go / missing background permission: fall back to foreground watching.
-      log.warn('foreground service unavailable, using watchPosition', e);
+      // Expo Go / missing background mode or permission: fall back to foreground watching.
+      log.warn('background location unavailable, using watchPosition', e);
     }
   }
   try {
