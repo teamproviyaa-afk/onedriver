@@ -4,8 +4,8 @@
  * Privileged operations (pricing, geofence decisions, state) are decided by the server.
  */
 import { HttpClient } from '@/api/httpClient';
-import type { CashDepositDto, CashDto, EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, SosResultDto, WalletDto } from '@/api/dto';
-import { mapCash, mapCashDeposit, mapEarnings, mapJob, mapJobEarnings, mapMe, mapMessageReceipt, mapNotification, mapOffer, mapPayoutMethod, mapPayoutTransfer, mapRider, mapWallet } from '@/api/mappers';
+import type { CashDepositDto, CashDto, DocumentDto, EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, SosResultDto, WalletDto } from '@/api/dto';
+import { mapCash, mapCashDeposit, mapDocument, mapEarnings, mapJob, mapJobEarnings, mapMe, mapMessageReceipt, mapNotification, mapOffer, mapPayoutMethod, mapPayoutTransfer, mapRider, mapWallet } from '@/api/mappers';
 import type {
   CashDeposit,
   CashSummary,
@@ -103,11 +103,15 @@ export class OneLocalApiProvider implements RiderDataProvider {
     const r = await this.http.post<{ organization: string; store: { id: string; name: string; zone?: string }; manager_name: string; daily_pay_text: string }>('/rider/store-link', { invite_code: inviteCode });
     return { storeId: r.store.id, storeName: r.store.name, organization: r.organization, zoneName: r.store.zone ?? '', managerName: r.manager_name, dailyPayText: r.daily_pay_text, priority: 1, status: 'active' };
   }
-  startDigilocker(): Promise<{ redirectUrl: string }> {
-    return this.http.post<{ redirect_url: string }>('/rider/kyc/digilocker/start').then((r) => ({ redirectUrl: r.redirect_url }));
+  /** The server opens a Cashfree Secure ID DigiLocker session (Aadhaar e-KYC). */
+  startDigilocker(): Promise<{ redirectUrl: string; verificationId?: string }> {
+    return this.http.post<{ redirect_url: string; verification_id?: string }>('/rider/kyc/digilocker/start').then((r) => ({ redirectUrl: r.redirect_url, verificationId: r.verification_id }));
   }
+  /** The server verifies each document with Cashfree Secure ID and answers verified / pending / rejected (with a reason). */
   submitDocument(input: KycDocumentInput): Promise<RiderDocument> {
-    return this.http.post<RiderDocument>('/rider/kyc/documents', { kind: input.kind, asset_id: input.assetId, number: input.number, source: input.source });
+    return this.http
+      .post<DocumentDto>('/rider/kyc/documents', { kind: input.kind, asset_id: input.assetId, number: input.number, source: input.source, dob: input.dob, verification_id: input.verificationId })
+      .then(mapDocument);
   }
   setVehicle(input: VehicleInput): Promise<RiderVehicle> {
     return this.http.put<RiderVehicle>('/rider/vehicle', { class: input.class, ownership: input.ownership, registration_no: input.registrationNo, rc_asset_id: input.rcAssetId });

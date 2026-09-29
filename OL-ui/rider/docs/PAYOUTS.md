@@ -24,6 +24,9 @@ Rider app ──► One Local server ──► payouts Edge Function (Supabase) 
 2. **Keys.** In the Cashfree dashboard → Payouts → Developers:
    * API keys → copy the Client ID and Client Secret (start with the **Test/Sandbox** keys);
    * Two-Factor Authentication → choose **Public Key** and download it (Supabase has no fixed IP to whitelist).
+   * Bank / UPI verification uses **Secure ID**: its keys go in `CASHFREE_VERIFICATION_CLIENT_ID`,
+     `CASHFREE_VERIFICATION_CLIENT_SECRET` and `CASHFREE_VERIFICATION_PUBLIC_KEY` (the same keys as KYC —
+     see [KYC.md](KYC.md)); left empty, the payout keys are used.
 3. **Configure and deploy** (from the repository root, on your computer):
    ```bash
    cp supabase/.env.payouts.example supabase/.env.payouts    # paste the keys there — never commit this file

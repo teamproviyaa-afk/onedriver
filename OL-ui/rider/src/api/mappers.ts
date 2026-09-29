@@ -22,7 +22,7 @@ import type {
   StoreLink,
   WalletSummary,
 } from '@/types';
-import type { CashDepositDto, CashDto, EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, RiderDto, WalletDto } from './dto';
+import type { CashDepositDto, CashDto, DocumentDto, EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, RiderDto, WalletDto } from './dto';
 
 const asCategory = (c: string): DeliveryCategory =>
   c === 'quick_drop' || c === 'pick_drop' ? c : 'on_order';
@@ -154,17 +154,7 @@ export const mapMe = (d: MeDto): RiderMe => ({
   vehicle: d.vehicle
     ? { class: d.vehicle.class as '2w' | '3w' | '4w', ownership: d.vehicle.ownership as 'own' | 'rent', registrationNo: d.vehicle.registration_no, model: d.vehicle.model, rcDocumentId: d.vehicle.rc_document_id }
     : undefined,
-  documents: (d.documents ?? []).map(
-    (x): RiderDocument => ({
-      id: x.id,
-      kind: x.kind as RiderDocument['kind'],
-      status: x.status as RiderDocument['status'],
-      numberMasked: x.number_masked,
-      source: x.source as RiderDocument['source'],
-      expiresOn: x.expires_on,
-      rejectionReason: x.rejection_reason,
-    }),
-  ),
+  documents: (d.documents ?? []).map(mapDocument),
   storeLinks: (d.store_links ?? []).map(
     (s): StoreLink => ({
       storeId: s.store_id,
@@ -310,4 +300,16 @@ export const mapCash = (d: CashDto): CashSummary => ({
   ledger: d.ledger.map((l) => ({ id: l.id, jobId: l.job_id, kind: l.kind, amount: l.amount, createdAt: l.created_at, note: l.note })),
   depositInstructions: d.deposit_instructions,
   upiDeposit: d.upi_deposit ? { enabled: d.upi_deposit.enabled, minAmount: d.upi_deposit.min_amount, maxAmount: d.upi_deposit.max_amount } : undefined,
+});
+
+export const mapDocument = (x: DocumentDto): RiderDocument => ({
+  id: x.id,
+  kind: x.kind as RiderDocument['kind'],
+  status: x.status as RiderDocument['status'],
+  numberMasked: x.number_masked ?? undefined,
+  assetId: x.asset_id ?? undefined,
+  source: (x.source ?? undefined) as RiderDocument['source'],
+  expiresOn: x.expires_on ?? undefined,
+  rejectionReason: x.rejection_reason ?? undefined,
+  reviewedAt: x.reviewed_at ?? undefined,
 });

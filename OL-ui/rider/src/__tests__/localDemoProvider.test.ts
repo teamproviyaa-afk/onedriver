@@ -308,7 +308,8 @@ describe('LocalDemoProvider — job engine', () => {
     expect((await p.getStatus()).expiredDocuments).toEqual(['dl']);
     await expect(p.setAvailability({ online: true, ...HUB })).rejects.toMatchObject({ code: 'not_enrolled' });
     const doc = await p.submitDocument({ kind: 'dl', assetId: 'asset-dl', source: 'upload', number: 'MH24 2019 0001234' });
-    expect(doc.status).toBe('pending');
+    // Verified straight away by Cashfree Secure ID (the returning rider's Aadhaar is verified).
+    expect(doc.status).toBe('verified');
     expect((await p.getStatus()).expiredDocuments).toEqual([]);
   });
 

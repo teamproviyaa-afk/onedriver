@@ -15,7 +15,7 @@
 | `/permissions/notifications` | notification-permission | Instant Gig Alerts |
 | `/onboarding/type` | rider-type-selection | Store · Solo · Taxi Partner (coming soon) |
 | `/onboarding/store/link` | store-link | invite code → matched merchant card |
-| `/onboarding/kyc` | store-kyc, solo-kyc | DigiLocker, selfie, DL, statuses, re-upload |
+| `/onboarding/kyc` | store-kyc, solo-kyc | DigiLocker Aadhaar, PAN, selfie liveness + face match, DL — verified by Cashfree Secure ID, refusal reasons, re-upload |
 | `/onboarding/vehicle` | store-vehicle, solo-vehicle | 2/3/4-wheeler, registration, RC, own/rent |
 | `/onboarding/rental` | rental-marketplace | COMING SOON (V2), non-operational |
 | `/onboarding/categories` | store-categories, solo-categories | Quick Drop · On-Order · Pick & Drop |

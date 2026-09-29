@@ -14,3 +14,8 @@ verify_jwt = false
 # Called by the One Local server (shared secret), Cashfree webhooks (signature) and the
 # checkout return redirect (no credentials; it only redirects back into the app).
 verify_jwt = false
+
+[functions.kyc]
+# Called by the One Local server (shared secret) and the DigiLocker return redirect (no
+# credentials; it only redirects back into the app).
+verify_jwt = false

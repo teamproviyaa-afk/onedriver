@@ -138,6 +138,13 @@ On **Cash in hand**, riders pay the COD cash they hold by UPI through Cashfree's
 credited as soon as Cashfree confirms it (and a rider blocked by the cash limit can go online again).
 The `payments` Edge Function holds the Cashfree keys. Setup: [docs/PAYMENTS.md](docs/PAYMENTS.md).
 
+## KYC (Cashfree Secure ID)
+
+Onboarding KYC is verified automatically on the server: Aadhaar via DigiLocker, PAN (matched to the
+Aadhaar name), selfie liveness + face match with the Aadhaar photo, driving licence and vehicle RC.
+Refusals show the reason on the screen. The `kyc` Edge Function holds the Cashfree keys; only masked
+numbers are stored. Setup: [docs/KYC.md](docs/KYC.md).
+
 ## Security & privacy
 
 * Only the Supabase **publishable** key ships in the app. No service-role, admin, payout or server secrets.

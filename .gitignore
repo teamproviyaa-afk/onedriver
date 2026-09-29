@@ -12,5 +12,7 @@ supabase/.env.payouts.tmp
 supabase/.env.notify.tmp
 supabase/.env.payments
 supabase/.env.payments.tmp
+supabase/.env.kyc
+supabase/.env.kyc.tmp
 supabase/.temp/
 supabase/.branches/

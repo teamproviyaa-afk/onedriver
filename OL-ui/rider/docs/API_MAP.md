@@ -11,9 +11,9 @@ Headers on every call: `authorization: Bearer <supabase access token>`, `x-app: 
 | `PUT /rider/hub` | `setHub` | /onboarding/hub/confirm |
 | `PUT /rider/type` | `setType` | /onboarding/type (taxi → 409 coming_soon) |
 | `POST /rider/store-link` | `linkStore` | /onboarding/store/link |
-| `POST /rider/kyc/digilocker/start` | `startDigilocker` | /onboarding/kyc |
-| `POST /rider/kyc/documents` | `submitDocument` | /onboarding/kyc, /onboarding/vehicle (RC) |
-| `PUT /rider/vehicle` | `setVehicle` | /onboarding/vehicle |
+| `POST /rider/kyc/digilocker/start` → `{ redirect_url, verification_id }` | `startDigilocker` | /onboarding/kyc (DigiLocker via Cashfree Secure ID) |
+| `POST /rider/kyc/documents` `{ kind, source, verification_id?, number?, asset_id?, dob? }` | `submitDocument` | /onboarding/kyc — verified / pending / rejected + `rejection_reason` (Secure ID) |
+| `PUT /rider/vehicle` | `setVehicle` | /onboarding/vehicle (RC verified by Secure ID; 422 `validation` with the reason) |
 | `PUT /rider/preferences` | `setPreferences` | /onboarding/categories → stores → acceptance |
 | `PUT /rider/payout` → `{ verified_name, name_match, … }` | `setPayout` | /onboarding/payout/bank, /onboarding/payout/upi (also `?mode=manage` from Profile / Withdraw; 422 `account_invalid` / `name_mismatch`) |
 | `POST /rider/submit` | `submitApplication` | /onboarding/priority (store) · /onboarding/payout/* (solo) |
@@ -61,3 +61,6 @@ timeout never pays twice. See [PAYOUTS.md](PAYOUTS.md).
 
 Cash deposits by UPI go through Cashfree Payment Gateway on the server (`payments` Edge Function);
 the app only opens the checkout URL it gets back. See [PAYMENTS.md](PAYMENTS.md).
+
+KYC (Aadhaar via DigiLocker, PAN, selfie liveness + face match, driving licence, vehicle RC) is verified by
+Cashfree Secure ID on the server (`kyc` Edge Function). See [KYC.md](KYC.md).

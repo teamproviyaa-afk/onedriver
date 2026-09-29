@@ -38,7 +38,7 @@ interface OnboardingDraft {
   riderType?: RiderType;
   storeInviteCode?: string;
   storeLinked?: { storeId: string; storeName: string; organization: string; managerName: string; dailyPayText: string; zoneName: string };
-  documents: Partial<Record<DocumentKind, { status: DocumentStatus; assetId?: string; number?: string; source: 'digilocker' | 'upload' }>>;
+  documents: Partial<Record<DocumentKind, { status: DocumentStatus; assetId?: string; number?: string; source: 'digilocker' | 'upload'; reason?: string }>>;
   vehicle?: { class: VehicleClass; ownership: VehicleOwnership; registrationNo: string; rcAssetId?: string };
   categories: DeliveryCategory[];
   multiStore: boolean;

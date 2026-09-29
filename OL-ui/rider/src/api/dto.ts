@@ -99,7 +99,7 @@ export interface MeDto {
   zone?: { id: string; city_id: string; name: string; boundary?: { lat: number; lng: number }[]; neighbours?: string[]; active?: boolean };
   hub?: { id: string; zone_id: string; kind: string; name?: string; lat: number; lng: number; address?: string; landmark?: string; accuracy_m?: number; source?: string; entrance_note?: string; store_id?: string };
   vehicle?: { class: string; ownership: string; registration_no: string; model?: string; rc_document_id?: string };
-  documents?: { id: string; kind: string; status: string; number_masked?: string; source?: string; expires_on?: string; rejection_reason?: string }[];
+  documents?: DocumentDto[];
   store_links?: { store_id: string; store_name: string; organization: string; zone_name?: string; manager_name?: string; daily_pay_text?: string; priority: number; status: string; payout_multiplier?: number }[];
   cash_in_hand: number;
   cash_limit: number;
@@ -228,4 +228,17 @@ export interface CashDto {
   ledger: { id: string; job_id?: string; kind: 'collected' | 'deposited' | 'adjustment'; amount: number; created_at: string; note?: string }[];
   deposit_instructions: string;
   upi_deposit?: { enabled: boolean; min_amount: number; max_amount: number } | null;
+}
+
+/** A KYC document as the server returns it (Cashfree Secure ID result behind it). */
+export interface DocumentDto {
+  id: string;
+  kind: string;
+  status: string;
+  number_masked?: string | null;
+  asset_id?: string | null;
+  source?: string | null;
+  expires_on?: string | null;
+  rejection_reason?: string | null;
+  reviewed_at?: string | null;
 }

@@ -140,6 +140,10 @@ export interface KycDocumentInput {
   assetId?: string;
   number?: string;
   source: DocumentSource;
+  /** Driving licence: date of birth (YYYY-MM-DD) when Aadhaar is not verified yet. */
+  dob?: string;
+  /** Aadhaar: the DigiLocker session the rider just finished. */
+  verificationId?: string;
 }
 
 export interface StatusInfo {

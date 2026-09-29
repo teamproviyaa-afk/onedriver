@@ -17,6 +17,7 @@
 | Privacy | `privacy.test.ts`, `localDemoProvider.test.ts` | address hidden before pickup_verified, phone unavailable after delivery, other rider's job → 404, PII stripped from caches |
 | Offline | `queueEngine.test.ts` | queue while offline, ordered replay, version conflict dropped (server wins), transient retry + SYNC ERROR state, idempotency keys, recordedAt preserved |
 | Navigation / tracking | `navigation.test.ts` | coordinate-only URLs with platform fallbacks, cadence rules, INR formatting |
+| KYC | `kyc.test.ts` | PAN normalise / check / mask, DD-MM-YYYY date of birth, document mapping with refusal reason, demo: DigiLocker Aadhaar → PAN (invalid / someone else's refused), selfie pending until Aadhaar then verified, licence needs a date of birth until Aadhaar, unknown licence / vehicle refused |
 | Cash deposits | `cashDeposits.test.ts` | never more than the cash in hand, min / max, API mapping, demo: pay → ledger credited + notification, same key never charges twice, cancelled / expired takes nothing, cash-limit rider unblocked |
 | Payouts | `payouts.test.ts` | amount parsing, withdrawal checks in server order, quick amounts, masking, name match (initials / titles / partial / someone else), next Monday 10:00, API mapping, demo wallet balance since last weekly payout, processing → credited with UTR + payout_sent WhatsApp, same idempotency key never pays twice, min / balance / 3-a-day limits, failed transfer returns the money, cash limit and suspension block withdrawals, UPI / bank verification refusals |
 
@@ -96,3 +97,22 @@ PAY BY UPI → ₹99,999 → "you can't deposit more than that" (button disabled
 UPI* → demo checkout → *Cancel payment* → "Payment not completed · No money was taken" → pay again →
 "Deposit received ₹320.00 · UPI · Ref …", ledger "UPI via Cashfree", cash in hand ₹0 → Dev scenario
 *Cash Limit* → BLOCKED → pay by UPI → OK → GO ONLINE works → Alerts "Cash deposit received".
+
+## KYC (Cashfree Secure ID)
+
+Automated: `supabase/tests/kyc.test.ts` (14 node:test tests — request formats, API version, the 2FA
+`x-cf-signature` decrypted with a real RSA key, multipart images; DigiLocker start / pending /
+verified with masked number, encrypted photo and no full UID stored; another rider's session, expired
+session and name mismatch refused; PAN matched to the Aadhaar name, invalid / someone else's refused,
+outage → retryable 502; selfie liveness + face match, photo deleted after the match, kept after a
+mismatch, pending before Aadhaar, https photo links; licence with the Aadhaar date of birth, invalid /
+expired / someone else's refused; RC active / rented / suspended / expired; daily attempt limit;
+config from the key; router end to end with the DigiLocker return redirect; Supabase store queries)
+and `src/__tests__/kyc.test.ts` (6 tests, above). `setup-kyc.sh` checked with stubbed `supabase` / `curl`.
+
+Headless web run (`DATA_MODE=local_demo`), 10/10 steps, 0 console errors: register a new rider → KYC →
+START Aadhaar → DigiLocker verified → PAN sheet opens → `ZZZZZ1234Z` → "This PAN is registered to
+SURESH PATIL" → `ABCDE1234F` → "Aadhaar (DigiLocker) and PAN verified" → selfie → "Liveness and face
+match verified" → licence `MH14 20110010000` (no date of birth asked) → "No licence was found" →
+RE-UPLOAD `MH14 20110012345` → "Licence verified" → Proceed → vehicle `MH 24 AB 0000` + RC photo →
+"No vehicle was found" → `MH 24 AB 1234` → categories.

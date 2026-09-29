@@ -1,4 +1,4 @@
-# Supabase — OneLocal messaging, payouts and payments
+# Supabase — OneLocal messaging, payouts, payments and KYC
 
 `functions/notify` sends WhatsApp, SMS and email for the OneLocal platform: WhatsApp first, SMS when
 the number is not on WhatsApp, fails, times out, or the code is requested again. Setup, secrets,
@@ -49,4 +49,21 @@ setup-payments.sh              one-command setup/deploy (+ test-deposit, status,
 functions/_shared/payments/    service, Cashfree PG client, stores, router
 functions/payments/index.ts    Edge Function entry (Deno.serve)
 migrations/*_cash_deposits.sql cash_deposits (RLS-locked) + reconciliation cron
+```
+
+## KYC (Cashfree Secure ID)
+
+`functions/kyc` verifies riders: Aadhaar via DigiLocker, PAN with name match, selfie liveness + face
+match with the Aadhaar photo, driving licence and vehicle RC. Masked numbers only; the Aadhaar photo is
+encrypted and deleted after the match (24 h at most); a daily attempt limit caps Cashfree charges.
+Setup and request format: [`OL-ui/rider/docs/KYC.md`](../OL-ui/rider/docs/KYC.md).
+
+Go live: `cp .env.kyc.example .env.kyc`, add the Secure ID Client ID, Client Secret and 2FA Public Key,
+`export SUPABASE_ACCESS_TOKEN=…`, then `bash supabase/setup-kyc.sh`.
+
+```
+setup-kyc.sh                   one-command setup/deploy (+ test-pan, test-digilocker, complete, health)
+functions/_shared/kyc/         service, Secure ID client, stores, router
+functions/kyc/index.ts         Edge Function entry (Deno.serve)
+migrations/*_kyc.sql           kyc_profiles + kyc_checks (RLS-locked), Aadhaar photo purge cron
 ```

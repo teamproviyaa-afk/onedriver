@@ -111,7 +111,8 @@ export interface RiderDataProvider {
   setHub(input: HubInput): Promise<Hub>;
   setType(type: RiderType): Promise<Rider>;
   linkStore(inviteCode: string): Promise<StoreLink>;
-  startDigilocker(): Promise<{ redirectUrl: string }>;
+  /** Cashfree Secure ID DigiLocker session; finish it with submitDocument({ kind: 'aadhaar', source: 'digilocker', verificationId }). */
+  startDigilocker(): Promise<{ redirectUrl: string; verificationId?: string }>;
   submitDocument(input: KycDocumentInput): Promise<RiderDocument>;
   setVehicle(input: VehicleInput): Promise<RiderVehicle>;
   setPreferences(input: RiderPreferences): Promise<RiderPreferences>;

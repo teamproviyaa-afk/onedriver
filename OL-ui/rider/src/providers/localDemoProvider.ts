@@ -68,6 +68,7 @@ import { computeEarnings } from '@/domain/earnings';
 import { MESSAGING, type MessagePolicy, demoHasWhatsApp, maskEmailForDisplay, maskPhoneForDisplay, normalizeEmail, routeMessage } from '@/domain/messaging';
 import { cashLedgerBalance, canGoOnlineWithCash, upiDepositProblem } from '@/domain/cash';
 import { canCallCustomer } from '@/domain/privacy';
+import { DEMO_KYC_TEST_VALUES, isValidPan, maskPan, normalizePan } from '@/domain/kyc';
 import { DEMO_PAYOUT_RULES, DEMO_PAYOUT_TEST_ACCOUNTS, bankForVpa, holdsBalance, maskPayoutDestination, matchNames, nextWeeklyPayoutAt, roundRupees, withdrawalProblem } from '@/domain/payouts';
 import { OTP } from '@/domain/otp';
 import {
@@ -744,36 +745,72 @@ export class LocalDemoProvider implements RiderDataProvider {
     return link;
   }
 
-  async startDigilocker(): Promise<{ redirectUrl: string }> {
-    await this.ready;
-    return { redirectUrl: 'onelocalrider://onboarding/kyc?digilocker=demo' };
-  }
-
-  async submitDocument(input: KycDocumentInput): Promise<RiderDocument> {
+  async startDigilocker(): Promise<{ redirectUrl: string; verificationId?: string }> {
     await this.ready;
     this.requireRider();
-    const doc: RiderDocument = {
-      id: `doc-${input.kind}`,
-      kind: input.kind,
-      status: input.source === 'digilocker' ? 'verified' : 'pending',
-      numberMasked: input.number ? maskNumber(input.number) : undefined,
-      assetId: input.assetId,
-      source: input.source,
-      expiresOn: input.kind === 'dl' ? '2029-03-14' : input.kind === 'rc' ? '2038-01-01' : undefined,
-      reviewedAt: input.source === 'digilocker' ? iso() : undefined,
-    };
+    return { redirectUrl: 'onelocalrider://onboarding/kyc?digilocker=demo', verificationId: newId('dgl') };
+  }
+
+  /**
+   * Simulates the server's Cashfree Secure ID checks: DigiLocker Aadhaar, PAN with name match,
+   * selfie liveness + face match against the Aadhaar photo, driving licence (Aadhaar date of birth).
+   */
+  async submitDocument(input: KycDocumentInput): Promise<RiderDocument> {
+    await this.ready;
+    const rider = this.requireRider();
+    const T = DEMO_KYC_TEST_VALUES;
+    const has = (kind: RiderDocument['kind']) => this.world.documents.some((d) => d.kind === kind && d.status === 'verified');
+    const base: RiderDocument = { id: `doc-${input.kind}`, kind: input.kind, status: 'verified', assetId: input.assetId, source: input.source, reviewedAt: iso() };
+    let doc: RiderDocument;
+    switch (input.kind) {
+      case 'aadhaar':
+        doc = { ...base, source: 'digilocker', numberMasked: 'XXXX XXXX 4821' };
+        break;
+      case 'pan': {
+        if (input.source === 'digilocker') {
+          doc = { ...base, numberMasked: 'ABXXXXX34F' };
+          break;
+        }
+        const pan = normalizePan(input.number ?? '');
+        if (!isValidPan(pan)) throw new ApiError({ code: 'validation', detail: 'Enter a valid PAN, e.g. ABCDE1234F', status: 400 });
+        if (pan === T.invalidPan) doc = { ...base, status: 'rejected', numberMasked: maskPan(pan), rejectionReason: 'This PAN is not valid. Check the number and try again.' };
+        else if (pan.startsWith(T.otherPersonPanPrefix)) doc = { ...base, status: 'rejected', numberMasked: maskPan(pan), rejectionReason: `This PAN is registered to ${T.otherPersonName}. Add your own PAN (${rider.fullName}).` };
+        else doc = { ...base, numberMasked: maskPan(pan) };
+        break;
+      }
+      case 'selfie':
+        doc = has('aadhaar') ? base : { ...base, status: 'pending', rejectionReason: 'Liveness passed. It will be matched with your Aadhaar photo once Aadhaar is verified.' };
+        break;
+      case 'dl': {
+        const number = (input.number ?? '').replace(/[\s-]/g, '').toUpperCase();
+        if (!has('aadhaar') && !input.dob) throw new ApiError({ code: 'validation', detail: 'Enter your date of birth as on the licence (or verify Aadhaar first).', status: 400 });
+        doc = number.endsWith(T.notFoundSuffix)
+          ? { ...base, status: 'rejected', numberMasked: input.number ? maskNumber(input.number) : undefined, rejectionReason: 'No licence was found for this number and date of birth. Check both and try again.' }
+          : { ...base, numberMasked: input.number ? maskNumber(input.number) : undefined, expiresOn: '2034-03-11' };
+        break;
+      }
+      default:
+        doc = { ...base, status: 'pending', numberMasked: input.number ? maskNumber(input.number) : undefined, expiresOn: input.kind === 'rc' ? '2038-01-01' : undefined, reviewedAt: undefined };
+    }
     this.world.documents = [...this.world.documents.filter((d) => d.kind !== input.kind), doc];
+    // Aadhaar arriving after the selfie: the server now runs the face match on the stored selfie.
+    if (input.kind === 'aadhaar') this.world.documents = this.world.documents.map((d) => (d.kind === 'selfie' && d.status === 'pending' ? { ...d, status: 'verified', rejectionReason: undefined, reviewedAt: iso() } : d));
     this.touch('status');
-    return doc;
+    return clone(doc);
   }
 
   async setVehicle(input: VehicleInput): Promise<RiderVehicle> {
     await this.ready;
     this.requireRider();
-    const v: RiderVehicle = { class: input.class, ownership: input.ownership, registrationNo: input.registrationNo.toUpperCase(), model: input.model, rcDocumentId: input.rcAssetId ? 'doc-rc' : undefined };
+    const registrationNo = input.registrationNo.toUpperCase();
+    // The server checks the RC with Cashfree Secure ID; unknown registrations are refused.
+    if (registrationNo.replace(/\s/g, '').endsWith(DEMO_KYC_TEST_VALUES.notFoundSuffix)) {
+      throw new ApiError({ code: 'validation', detail: 'No vehicle was found for this registration number. Check it and try again.', status: 422 });
+    }
+    const v: RiderVehicle = { class: input.class, ownership: input.ownership, registrationNo, model: input.model, rcDocumentId: input.rcAssetId ? 'doc-rc' : undefined };
     this.world.vehicle = v;
     if (input.rcAssetId) {
-      this.world.documents = [...this.world.documents.filter((d) => d.kind !== 'rc'), { id: 'doc-rc', kind: 'rc', status: 'pending', numberMasked: v.registrationNo, assetId: input.rcAssetId, source: 'upload' }];
+      this.world.documents = [...this.world.documents.filter((d) => d.kind !== 'rc'), { id: 'doc-rc', kind: 'rc', status: 'verified', numberMasked: v.registrationNo, assetId: input.rcAssetId, source: 'upload', expiresOn: '2038-01-01', reviewedAt: iso() }];
     }
     this.touch('status');
     return v;

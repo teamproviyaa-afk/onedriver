@@ -20,6 +20,7 @@ import { isDevBuild } from '@/config/env';
 import { DEMO_OTP_CODE, DEMO_RETURNING_PHONE, DEMO_STORE_INVITE_CODES } from '@/demo/constants';
 import { DEMO_NO_WHATSAPP_PHONES } from '@/domain/messaging';
 import { DEMO_PAYOUT_TEST_ACCOUNTS } from '@/domain/payouts';
+import { DEMO_KYC_TEST_VALUES } from '@/domain/kyc';
 import type { DemoOutboxMessage } from '@/types';
 import { formatClock } from '@/utils/format';
 
@@ -128,6 +129,9 @@ export default function DevScenariosScreen() {
           <AppText variant="bodySm">Not on WhatsApp (SMS fallback): {DEMO_NO_WHATSAPP_PHONES.join(', ')}</AppText>
           <AppText variant="bodySm">
             Payout checks: UPI {DEMO_PAYOUT_TEST_ACCOUNTS.invalidVpaPrefix}@ybl (inactive) · {DEMO_PAYOUT_TEST_ACCOUNTS.mismatchVpaPrefix}@ybl (someone else&apos;s name) · bank A/C ending {DEMO_PAYOUT_TEST_ACCOUNTS.invalidAccountSuffix} / {DEMO_PAYOUT_TEST_ACCOUNTS.mismatchAccountSuffix}
+          </AppText>
+          <AppText variant="bodySm">
+            KYC checks: PAN {DEMO_KYC_TEST_VALUES.invalidPan} (not valid) · {DEMO_KYC_TEST_VALUES.otherPersonPanPrefix}1234Z (someone else&apos;s) · licence or vehicle number ending {DEMO_KYC_TEST_VALUES.notFoundSuffix} (not found)
           </AppText>
         </Card>
       </View>
