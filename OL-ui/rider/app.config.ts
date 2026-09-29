@@ -30,13 +30,15 @@ const appConfig = ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'OneLocal Rider',
   slug: 'onelocal-rider',
-  version: '1.0.0',
+  // Bump all three for every release you install on phones (appVersionSource: local in eas.json).
+  version: '1.1.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: 'onelocalrider',
   userInterfaceStyle: 'light',
   ios: {
     bundleIdentifier: 'com.onelocal.rider',
+    buildNumber: '2',
     supportsTablet: false,
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
@@ -53,6 +55,7 @@ const appConfig = ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.onelocal.rider',
+    versionCode: 2,
     adaptiveIcon: {
       backgroundColor: '#61FF00',
       foregroundImage: './assets/images/android-icon-foreground.png',
