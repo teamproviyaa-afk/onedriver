@@ -114,6 +114,14 @@ Android foreground service, demo route simulator, track batching), `src/notifica
 
 See `docs/ARCHITECTURE.md`, `docs/API_MAP.md`, `docs/DECISIONS.md`, `docs/QA.md`.
 
+## Splash (OneLocal brand film)
+
+Launch screen: the OneLocal wordmark on the film's green (`#3FA841`, `app.config.ts`). The app then plays
+the brand film full screen, muted, while it restores the session: **the whole film on first launch**
+(Skip after 1 s), **only the 2.3 s logo reveal on later launches**, and the static logo when the
+device asks for reduced motion. It never holds the app longer than 12 s. Tune it in
+`src/features/splash/splashPlan.ts`; assets are in `assets/brand/` (MP4 for Android / iOS, WebM for web).
+
 ## Messaging (WhatsApp → SMS, email)
 
 Sign-in codes, the customer's delivery OTP, receipts, approvals, payouts, statements and SOS alerts are

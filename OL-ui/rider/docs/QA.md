@@ -116,3 +116,16 @@ SURESH PATIL" → `ABCDE1234F` → "Aadhaar (DigiLocker) and PAN verified" → s
 match verified" → licence `MH14 20110010000` (no date of birth asked) → "No licence was found" →
 RE-UPLOAD `MH14 20110012345` → "Licence verified" → Proceed → vehicle `MH 24 AB 0000` + RC photo →
 "No vehicle was found" → `MH 24 AB 1234` → categories.
+
+## Splash (brand film)
+
+Automated: `src/__tests__/splash.test.ts` (mode per launch; the short clip ends when the logo is assembled).
+`npx expo export --platform android --platform ios` bundles `assets/brand/splash.mp4` (1.4 MB).
+
+Headless web run, 7/7 steps, 0 console errors: first launch plays the WebM muted → Skip appears →
+still playing at 3.4 s (phone mock-up) → Skip → intro; reload (returning) → no Skip, intro in ~4 s;
+fresh device, not skipped → film plays to the last frame and continues (~12 s including page load);
+`prefers-reduced-motion` → static logo, no playback → intro. Regressions found and fixed by the run:
+on web `play()` in the player setup ran before the `<video>` existed (splash stuck at 0 s) — playback
+now also starts when the player is ready, with a 4 s no-progress fallback and a 12 s hard cap; and the
+`<video>` ignored `inset: 0` and kept its 720×1280 size — it now gets an explicit 100 % width/height.

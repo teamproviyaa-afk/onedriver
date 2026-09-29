@@ -84,11 +84,13 @@ const appConfig = ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#61FF00',
-        image: './assets/images/splash-icon.png',
+        // Matches the first frame of the brand film (src/features/splash) so launch → film has no flash.
+        backgroundColor: '#3FA841',
+        image: './assets/images/splash-onelocal.png',
         imageWidth: 240,
       },
     ],
+    'expo-video',
     [
       'expo-location',
       {

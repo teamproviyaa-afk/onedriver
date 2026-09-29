@@ -2,7 +2,7 @@
 
 | Route (src/app) | Figma frame(s) | Notes |
 |---|---|---|
-| `/` (index) | Splash | lime gradient + wordmark; restores session / status / active job, then routes |
+| `/` (index) | Splash (brand film) | OneLocal film (full once with Skip, then the logo reveal; static logo with reduced motion) while the session / status / active job are restored, then routes |
 | `/intro` | screen-intro-1/2/3 | 3-card carousel, Skip / Next / Get Started |
 | `/permissions/location` | screen-location | Find Orders Nearby — Allow / Not now |
 | `/sign-in` | screen-login | phone +91, Continue, Register here |

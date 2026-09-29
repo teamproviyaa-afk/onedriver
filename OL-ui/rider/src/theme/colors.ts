@@ -27,8 +27,6 @@ export const colors = {
   lime: '#76EC00',
   limeBright: '#A1FE2F',
   limeElectric: '#B3F400',
-  limeSplashTop: '#61FF00',
-  limeSplashMid: '#52F000',
   limeTint: 'rgba(118, 236, 0, 0.10)',
   darkAction: '#0C1F15',
 
