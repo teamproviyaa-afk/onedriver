@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { AppText, Card, Divider, EmptyState, ErrorState, GhostButton, InfoBanner, KeyValueRow, LoadingState, PrimaryButton, Screen, SectionLabel, StatusChip, toast } from '@/components/ui';
 import { AppHeader } from '@/components/app';
+import { UpiDeposit } from '@/features/cash/UpiDeposit';
 import { isLocalDemo } from '@/config/env';
 import { cashHeadroom } from '@/domain/cash';
 import { queryKeys, useCash } from '@/hooks';
@@ -50,11 +51,13 @@ const LedgerRow = ({ entry }: { entry: CashLedgerEntry }) => {
 
 /**
  * Cash in hand (spec §4.3): COD collected minus deposits against the city limit. Above the
- * limit the rider is blocked from going online until a deposit is recorded. Same visual
- * language as the earnings / profile cards (no dedicated Figma frame).
+ * limit the rider is blocked from going online until a deposit is recorded — at the store
+ * counter or by UPI (Cashfree Payment Gateway). Same visual language as the earnings / profile
+ * cards (no dedicated Figma frame).
  */
 export default function CashScreen() {
   const qc = useQueryClient();
+  const { deposit } = useLocalSearchParams<{ deposit?: string }>();
   const { data, isLoading, error, refetch, isRefetching } = useCash();
   const [depositing, setDepositing] = useState(false);
 
@@ -134,6 +137,8 @@ export default function CashScreen() {
             {statusCopy}
           </AppText>
         </Card>
+
+        <UpiDeposit cash={data} returnedDepositId={typeof deposit === 'string' ? deposit : undefined} />
 
         <View style={styles.section}>
           <SectionLabel>HOW TO DEPOSIT</SectionLabel>

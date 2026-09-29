@@ -17,6 +17,7 @@
 | Privacy | `privacy.test.ts`, `localDemoProvider.test.ts` | address hidden before pickup_verified, phone unavailable after delivery, other rider's job → 404, PII stripped from caches |
 | Offline | `queueEngine.test.ts` | queue while offline, ordered replay, version conflict dropped (server wins), transient retry + SYNC ERROR state, idempotency keys, recordedAt preserved |
 | Navigation / tracking | `navigation.test.ts` | coordinate-only URLs with platform fallbacks, cadence rules, INR formatting |
+| Cash deposits | `cashDeposits.test.ts` | never more than the cash in hand, min / max, API mapping, demo: pay → ledger credited + notification, same key never charges twice, cancelled / expired takes nothing, cash-limit rider unblocked |
 | Payouts | `payouts.test.ts` | amount parsing, withdrawal checks in server order, quick amounts, masking, name match (initials / titles / partial / someone else), next Monday 10:00, API mapping, demo wallet balance since last weekly payout, processing → credited with UTR + payout_sent WhatsApp, same idempotency key never pays twice, min / balance / 3-a-day limits, failed transfer returns the money, cash limit and suspension block withdrawals, UPI / bank verification refusals |
 
 Static checks: `npm run typecheck` (tsc strict), `npm run lint` (eslint-config-expo incl. React Compiler rules), `npx expo export --platform android` (Metro bundle).
@@ -80,3 +81,18 @@ fee Free, you receive ₹500.00 → confirm sheet "will be sent to UPI ra••�
 *Done* → Withdraw shows "UPI · Google Pay · SBI" → Profile shows the new UPI ID → Alerts: "Withdrawal
 credited" and "Withdrawal failed" → Dev scenario *Cash Limit* → "Deposit your cash in hand (₹2,720) first"
 → Dev → Messages sent lists the payout_sent WhatsApp with the UTR.
+
+## Cash deposits by UPI (Cashfree Payment Gateway)
+
+Automated: `supabase/tests/payments.test.ts` (17 node:test tests — Cashfree PG request format and
+headers, deterministic link id, same key one link, lost response recovered without a second link,
+rejected link, validation, webhook signature, forged "paid" ignored until Cashfree says so, short
+payment never credited, expired then late payment, sweep, safe return redirect, key-based environment,
+router end to end, Supabase store queries) and `src/__tests__/cashDeposits.test.ts` (6 tests, above).
+`setup-payments.sh` checked with stubbed `supabase` / `curl`.
+
+Headless web run (`DATA_MODE=local_demo`), 9/9 steps, 0 console errors: sign in → Cash in hand ₹320 →
+PAY BY UPI → ₹99,999 → "you can't deposit more than that" (button disabled) → All → *PAY ₹320.00 BY
+UPI* → demo checkout → *Cancel payment* → "Payment not completed · No money was taken" → pay again →
+"Deposit received ₹320.00 · UPI · Ref …", ledger "UPI via Cashfree", cash in hand ₹0 → Dev scenario
+*Cash Limit* → BLOCKED → pay by UPI → OK → GO ONLINE works → Alerts "Cash deposit received".

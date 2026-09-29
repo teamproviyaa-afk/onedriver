@@ -208,3 +208,24 @@ export interface WalletDto {
   payout_method: PayoutMethodDto | null;
   recent: PayoutTransferDto[];
 }
+
+/** POST /rider/cash/deposits and GET /rider/cash/deposits/:id (Cashfree payment link behind it). */
+export interface CashDepositDto {
+  id: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'expired' | 'cancelled' | 'failed';
+  checkout_url?: string | null;
+  expires_at?: string | null;
+  reference?: string | null;
+  method?: string | null;
+  created_at: string;
+  paid_at?: string | null;
+}
+
+export interface CashDto {
+  cash_in_hand: number;
+  cash_limit: number;
+  ledger: { id: string; job_id?: string; kind: 'collected' | 'deposited' | 'adjustment'; amount: number; created_at: string; note?: string }[];
+  deposit_instructions: string;
+  upi_deposit?: { enabled: boolean; min_amount: number; max_amount: number } | null;
+}

@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ApiError } from '@/types';
 import type {
+  CashDeposit,
   CashLedgerEntry,
   CashSummary,
   DemoOutboxMessage,
@@ -65,7 +66,7 @@ import { GEOFENCE, checkProofDistance } from '@/domain/geofence';
 import { DISPATCH } from '@/domain/dispatch';
 import { computeEarnings } from '@/domain/earnings';
 import { MESSAGING, type MessagePolicy, demoHasWhatsApp, maskEmailForDisplay, maskPhoneForDisplay, normalizeEmail, routeMessage } from '@/domain/messaging';
-import { cashLedgerBalance, canGoOnlineWithCash } from '@/domain/cash';
+import { cashLedgerBalance, canGoOnlineWithCash, upiDepositProblem } from '@/domain/cash';
 import { canCallCustomer } from '@/domain/privacy';
 import { DEMO_PAYOUT_RULES, DEMO_PAYOUT_TEST_ACCOUNTS, bankForVpa, holdsBalance, maskPayoutDestination, matchNames, nextWeeklyPayoutAt, roundRupees, withdrawalProblem } from '@/domain/payouts';
 import { OTP } from '@/domain/otp';
@@ -92,6 +93,7 @@ import {
 } from '@/demo/seed';
 import {
   DEMO_OFFER_DELAY_SECONDS,
+  DEMO_CHECKOUT_PREFIX,
   DEMO_REOFFER_DELAY_SECONDS,
   DEMO_RETURNING_PHONE,
   DEMO_STATUS_STEP_SECONDS,
@@ -177,6 +179,11 @@ interface DemoMessagingState {
   noWhatsApp: Record<string, boolean>;
 }
 
+/** A simulated Cashfree payment link for a cash deposit (what the server keeps in `cash_deposits`). */
+interface DemoDeposit extends CashDeposit {
+  idempotencyKey: string;
+}
+
 /** A simulated Cashfree transfer (what the server keeps in `payouts`). */
 interface DemoPayout extends PayoutTransfer {
   idempotencyKey?: string;
@@ -229,6 +236,7 @@ interface DemoWorld {
   outbox: DemoOutboxMessage[];
   messaging: DemoMessagingState;
   payouts: DemoPayout[];
+  deposits: DemoDeposit[];
   /** When the last weekly payout ran; earnings delivered after it are unpaid. */
   settledAt?: string;
 }
@@ -269,6 +277,7 @@ const freshWorld = (phone: string | null): DemoWorld => ({
   outbox: [],
   messaging: { lastWhatsApp: {}, sends: {}, noWhatsApp: {} },
   payouts: [],
+  deposits: [],
 });
 
 /** Seeds the returning demo rider (Rahul Sharma, approved Store Rider). */
@@ -318,6 +327,7 @@ export class LocalDemoProvider implements RiderDataProvider {
             outbox: parsed.outbox ?? [],
             messaging: parsed.messaging ?? { lastWhatsApp: {}, sends: {}, noWhatsApp: {} },
             payouts: parsed.payouts ?? (returning ? makeDemoPayouts() : []),
+            deposits: parsed.deposits ?? [],
             settledAt: parsed.payouts ? parsed.settledAt : returning ? makeLastSettledAt() : undefined,
           };
         }
@@ -1491,8 +1501,69 @@ export class LocalDemoProvider implements RiderDataProvider {
       cashLimit: rider.cashLimit,
       blocked: !canGoOnlineWithCash(cashInHand, rider.cashLimit),
       ledger: [...this.world.ledger].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      depositInstructions: 'Deposit cash at Store A (Express MegaMart) counter or via the OneLocal UPI collect request. Deposits reflect within 30 minutes.',
+      depositInstructions: 'Pay by UPI above, or deposit cash at Store A (Express MegaMart) counter. Counter deposits reflect within 30 minutes.',
+      upiDeposit: { enabled: true, minAmount: 1, maxAmount: Math.max(1, cashInHand) },
     };
+  }
+
+  // ── Cash deposits by UPI (simulated Cashfree Payment Gateway) ─────
+  async createCashDeposit(amount: number, idempotencyKey: string): Promise<CashDeposit> {
+    await this.ready;
+    this.requireRider();
+    // Same key → same checkout, exactly like the server (a retried request never charges twice).
+    const existing = this.world.deposits.find((d) => d.idempotencyKey === idempotencyKey);
+    if (existing) return publicDeposit(existing);
+    const value = roundRupees(amount);
+    const problem = upiDepositProblem(value, await this.getCash());
+    if (problem) throw new ApiError({ code: 'validation', detail: problem, status: 422 });
+    const id = newId('dep');
+    const deposit: DemoDeposit = {
+      id,
+      amount: value,
+      status: 'pending',
+      checkoutUrl: `${DEMO_CHECKOUT_PREFIX}${id}`,
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      createdAt: iso(),
+      idempotencyKey,
+    };
+    this.world.deposits.unshift(deposit);
+    this.touch('world');
+    return publicDeposit(deposit);
+  }
+
+  async getCashDeposit(id: string): Promise<CashDeposit> {
+    await this.ready;
+    this.requireRider();
+    const d = this.world.deposits.find((x) => x.id === id);
+    if (!d) throw new ApiError({ code: 'not_found', detail: 'Deposit not found', status: 404 });
+    if (d.status === 'pending' && d.expiresAt && Date.parse(d.expiresAt) <= Date.now()) {
+      d.status = 'expired';
+      d.checkoutUrl = undefined;
+      this.touch('world');
+    }
+    return publicDeposit(d);
+  }
+
+  /** Demo checkout: what Cashfree would report after the rider pays (or closes the page). */
+  async completeDemoCheckout(id: string, outcome: 'paid' | 'cancelled'): Promise<CashDeposit> {
+    await this.ready;
+    const d = this.world.deposits.find((x) => x.id === id);
+    if (!d) throw new ApiError({ code: 'not_found', detail: 'Deposit not found', status: 404 });
+    if (d.status !== 'pending') return publicDeposit(d);
+    d.checkoutUrl = undefined;
+    if (outcome === 'cancelled') {
+      d.status = 'cancelled';
+      this.touch('world');
+      return publicDeposit(d);
+    }
+    d.status = 'paid';
+    d.method = 'upi';
+    d.reference = String(4265e8 + Math.floor(Math.random() * 1e8)).padEnd(12, '0').slice(0, 12);
+    d.paidAt = iso();
+    this.world.ledger.push({ id: newId('l'), kind: 'deposited', amount: d.amount, createdAt: d.paidAt, note: `UPI via Cashfree · Ref ${d.reference}` });
+    this.notify({ kind: 'payment_disbursed', title: 'Cash deposit received', body: `${formatINR(d.amount)} received by UPI. Ref ${d.reference}.`, deepLink: '/cash' });
+    this.touch('status');
+    return publicDeposit(d);
   }
 
   /** Demo only: records a deposit so the tester can clear the cash limit. */
@@ -1650,6 +1721,8 @@ export class LocalDemoProvider implements RiderDataProvider {
     return this.world.waits;
   }
 }
+
+const publicDeposit = ({ idempotencyKey: _key, ...d }: DemoDeposit): CashDeposit => clone(d);
 
 /** Strips the simulation-only fields. */
 const publicPayout = ({ idempotencyKey: _key, settleAt: _settle, ...p }: DemoPayout): PayoutTransfer => clone(p);

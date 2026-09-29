@@ -95,6 +95,16 @@ export const useJobHistory = () => useQuery({ queryKey: queryKeys.history, query
 
 export const useCash = () => useQuery({ queryKey: queryKeys.cash, queryFn: () => provider().getCash(), staleTime: 5_000 });
 
+/** A UPI cash deposit, polled while the rider pays on the Cashfree checkout (stops once final). */
+export const useCashDeposit = (id: string | undefined) =>
+  useQuery({
+    queryKey: queryKeys.cashDeposit(id ?? ''),
+    queryFn: () => provider().getCashDeposit(id!),
+    enabled: !!id,
+    staleTime: 0,
+    refetchInterval: (q) => (q.state.data && q.state.data.status !== 'pending' ? false : 3_000),
+  });
+
 /** GET /rider/wallet — refreshes while a withdrawal is in flight so the balance follows it. */
 export const useWallet = () =>
   useQuery({

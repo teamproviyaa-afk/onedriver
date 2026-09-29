@@ -72,4 +72,27 @@ export interface CashSummary {
   blocked: boolean;
   ledger: CashLedgerEntry[];
   depositInstructions: string;
+  /** Pay the cash in hand by UPI (Cashfree Payment Gateway). Absent / disabled → counter deposits only. */
+  upiDeposit?: { enabled: boolean; minAmount: Rupees; maxAmount: Rupees };
+}
+
+/**
+ * pending — waiting for the rider to pay on the Cashfree checkout; paid — Cashfree confirmed it and
+ * the cash ledger is credited; expired / cancelled / failed — nothing was taken.
+ */
+export type CashDepositStatus = 'pending' | 'paid' | 'expired' | 'cancelled' | 'failed';
+
+export interface CashDeposit {
+  id: string;
+  amount: Rupees;
+  status: CashDepositStatus;
+  /** Cashfree checkout page, only while the deposit can be paid. */
+  checkoutUrl?: string;
+  expiresAt?: IsoDate;
+  /** UPI / bank reference once paid. */
+  reference?: string;
+  /** upi, net_banking … */
+  method?: string;
+  createdAt: IsoDate;
+  paidAt?: IsoDate;
 }

@@ -53,7 +53,7 @@
 | `/earnings/week` | earnings-weekly | chart, insights, statement PDF |
 | `/earnings/job/[id]` | earnings-breakdown | base + distance + peak + wait + tip, rule version |
 | `/tasks/[id]` | delivery-detail | timeline, verification, earnings |
-| `/cash` | — | cash in hand, limit, ledger, deposit (spec §4.3) |
+| `/cash` | — | cash in hand, limit, ledger, PAY BY UPI (Cashfree checkout), counter deposit (spec §4.3) |
 | `/support` | — | helpline, ticket (coming soon), FAQ |
 | `/dev/scenarios` | — | development-only scenario switcher |
 | `+not-found` | — | branded fallback |

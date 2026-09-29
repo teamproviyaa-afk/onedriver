@@ -5,3 +5,12 @@ project_id = "onelocal"
 # Every route authenticates itself (shared secret, provider signatures or the Auth hook
 # signature), and provider webhooks cannot send a Supabase JWT.
 verify_jwt = false
+
+[functions.payouts]
+# Called by the One Local server (shared secret) and Cashfree webhooks (signature).
+verify_jwt = false
+
+[functions.payments]
+# Called by the One Local server (shared secret), Cashfree webhooks (signature) and the
+# checkout return redirect (no credentials; it only redirects back into the app).
+verify_jwt = false

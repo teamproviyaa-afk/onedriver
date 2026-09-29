@@ -8,3 +8,6 @@ export const DEMO_OFFER_DELAY_SECONDS = 4;
 export const DEMO_REOFFER_DELAY_SECONDS = 8;
 export const DEMO_STATUS_STEP_SECONDS = { submitted: 6, verificationPending: 14 } as const;
 export const DEMO_STORAGE_KEY = 'onelocal.rider.demo.world.v1';
+
+/** Local demo cash deposits "open" this instead of a Cashfree checkout page. */
+export const DEMO_CHECKOUT_PREFIX = 'demo://cashfree-checkout/';

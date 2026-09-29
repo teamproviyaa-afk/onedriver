@@ -1,4 +1,5 @@
 import type {
+  CashDeposit,
   CashSummary,
   DeclineReason,
   EarningsSummary,
@@ -151,6 +152,12 @@ export interface RiderDataProvider {
   /** Emails the weekly statement to the rider's email on file. */
   emailStatement(week: string): Promise<MessageReceipt>;
   getCash(): Promise<CashSummary>;
+  /**
+   * Starts a UPI payment of cash in hand (Cashfree Payment Gateway on the server). The same
+   * idempotency key always returns the same checkout, so a retry never charges twice.
+   */
+  createCashDeposit(amount: number, idempotencyKey: string): Promise<CashDeposit>;
+  getCashDeposit(id: string): Promise<CashDeposit>;
   /** Balance, withdrawal limits, the verified payout account and recent transfers. */
   getWallet(): Promise<WalletSummary>;
   listPayouts(cursor?: string): Promise<Paginated<PayoutTransfer>>;

@@ -1,4 +1,6 @@
 import type {
+  CashDeposit,
+  CashSummary,
   MessageFallbackReason,
   MessageReceipt,
   DeliveryCategory,
@@ -20,7 +22,7 @@ import type {
   StoreLink,
   WalletSummary,
 } from '@/types';
-import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, RiderDto, WalletDto } from './dto';
+import type { CashDepositDto, CashDto, EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, RiderDto, WalletDto } from './dto';
 
 const asCategory = (c: string): DeliveryCategory =>
   c === 'quick_drop' || c === 'pick_drop' ? c : 'on_order';
@@ -287,4 +289,25 @@ export const mapWallet = (d: WalletDto): WalletSummary => ({
   weekly: { nextPayoutAt: d.weekly.next_payout_at, description: d.weekly.description },
   payoutMethod: d.payout_method ? mapPayoutMethod(d.payout_method) : null,
   recent: d.recent.map(mapPayoutTransfer),
+});
+
+export const mapCashDeposit = (d: CashDepositDto): CashDeposit => ({
+  id: d.id,
+  amount: d.amount,
+  status: d.status,
+  checkoutUrl: d.checkout_url ?? undefined,
+  expiresAt: d.expires_at ?? undefined,
+  reference: d.reference ?? undefined,
+  method: d.method ?? undefined,
+  createdAt: d.created_at,
+  paidAt: d.paid_at ?? undefined,
+});
+
+export const mapCash = (d: CashDto): CashSummary => ({
+  cashInHand: d.cash_in_hand,
+  cashLimit: d.cash_limit,
+  blocked: d.cash_in_hand >= d.cash_limit,
+  ledger: d.ledger.map((l) => ({ id: l.id, jobId: l.job_id, kind: l.kind, amount: l.amount, createdAt: l.created_at, note: l.note })),
+  depositInstructions: d.deposit_instructions,
+  upiDeposit: d.upi_deposit ? { enabled: d.upi_deposit.enabled, minAmount: d.upi_deposit.min_amount, maxAmount: d.upi_deposit.max_amount } : undefined,
 });

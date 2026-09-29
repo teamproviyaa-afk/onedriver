@@ -132,6 +132,12 @@ Cashfree (must be in the rider's name). The app holds no payout keys — the ser
 Function in [`supabase/`](../../supabase) talks to Cashfree. Setup: [docs/PAYOUTS.md](docs/PAYOUTS.md).
 In the local demo it is fully simulated (dev scenario **Withdrawal Fails**, test UPI IDs `invalid@ybl`, `mismatch@ybl`).
 
+## Cash deposits by UPI (Cashfree Payment Gateway)
+
+On **Cash in hand**, riders pay the COD cash they hold by UPI through Cashfree's checkout; the ledger is
+credited as soon as Cashfree confirms it (and a rider blocked by the cash limit can go online again).
+The `payments` Edge Function holds the Cashfree keys. Setup: [docs/PAYMENTS.md](docs/PAYMENTS.md).
+
 ## Security & privacy
 
 * Only the Supabase **publishable** key ships in the app. No service-role, admin, payout or server secrets.

@@ -4,9 +4,10 @@
  * Privileged operations (pricing, geofence decisions, state) are decided by the server.
  */
 import { HttpClient } from '@/api/httpClient';
-import type { EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, SosResultDto, WalletDto } from '@/api/dto';
-import { mapEarnings, mapJob, mapJobEarnings, mapMe, mapMessageReceipt, mapNotification, mapOffer, mapPayoutMethod, mapPayoutTransfer, mapRider, mapWallet } from '@/api/mappers';
+import type { CashDepositDto, CashDto, EarningsDto, JobDto, JobEarningsDto, MeDto, MessageReceiptDto, NotificationDto, OfferDto, PayoutMethodDto, PayoutTransferDto, SosResultDto, WalletDto } from '@/api/dto';
+import { mapCash, mapCashDeposit, mapEarnings, mapJob, mapJobEarnings, mapMe, mapMessageReceipt, mapNotification, mapOffer, mapPayoutMethod, mapPayoutTransfer, mapRider, mapWallet } from '@/api/mappers';
 import type {
+  CashDeposit,
   CashSummary,
   DeclineReason,
   EarningsSummary,
@@ -223,7 +224,14 @@ export class OneLocalApiProvider implements RiderDataProvider {
     return `${(this.http as unknown as { baseUrl: string }).baseUrl}/rider/statements/${week}.pdf`;
   }
   getCash(): Promise<CashSummary> {
-    return this.http.get<{ cash_in_hand: number; cash_limit: number; ledger: CashSummary['ledger']; deposit_instructions: string }>('/rider/cash').then((r) => ({ cashInHand: r.cash_in_hand, cashLimit: r.cash_limit, blocked: r.cash_in_hand >= r.cash_limit, ledger: r.ledger, depositInstructions: r.deposit_instructions }));
+    return this.http.get<CashDto>('/rider/cash').then(mapCash);
+  }
+  /** The server creates a Cashfree payment link; the Idempotency-Key makes a retry return the same one. */
+  createCashDeposit(amount: number, idempotencyKey: string): Promise<CashDeposit> {
+    return this.http.post<CashDepositDto>('/rider/cash/deposits', { amount }, idempotencyKey).then(mapCashDeposit);
+  }
+  getCashDeposit(id: string): Promise<CashDeposit> {
+    return this.http.get<CashDepositDto>(`/rider/cash/deposits/${encodeURIComponent(id)}`).then(mapCashDeposit);
   }
   getWallet(): Promise<WalletSummary> {
     return this.http.get<WalletDto>('/rider/wallet').then(mapWallet);

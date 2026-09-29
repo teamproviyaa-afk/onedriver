@@ -41,7 +41,8 @@ Headers on every call: `authorization: Bearer <supabase access token>`, `x-app: 
 | `GET /rider/jobs?cursor=` | `listJobs` | /tasks |
 | `GET /rider/statements/:week.pdf` | `getStatementUrl` | /earnings/week |
 | `POST /rider/statements/:week/email` | `emailStatement` | /earnings/week "Email me this statement" (400 `validation` without an email) |
-| `GET /rider/cash` | `getCash` | /cash |
+| `GET /rider/cash` | `getCash` | /cash (`upi_deposit` enables PAY BY UPI) |
+| `POST /rider/cash/deposits` `{ amount }` + `Idempotency-Key` · `GET /rider/cash/deposits/:id` | `createCashDeposit` / `getCashDeposit` | /cash PAY BY UPI (Cashfree checkout, status polled until final; 422 `validation` above the cash in hand) |
 | `GET /rider/wallet` | `getWallet` | /earnings/withdraw, Profile (payout method) |
 | `POST /rider/payouts/withdraw` `{ amount }` + `Idempotency-Key` | `requestWithdrawal` | /earnings/withdraw (422 `validation` / `insufficient_balance` / `payout_blocked`, 409 `no_payout_account`, 429 `rate_limited`) |
 | `GET /rider/payouts` · `GET /rider/payouts/:id` | `listPayouts` / `getPayout` | /earnings/withdraw (status polled until final) |
@@ -57,3 +58,6 @@ job responses may carry `otp_delivery` (how the customer received the delivery O
 Payouts (withdrawals, weekly payouts, UPI / bank verification) go through Cashfree on the server
 (`payouts` Edge Function). The app sends an `Idempotency-Key` per withdrawal and reuses it on retry, so a
 timeout never pays twice. See [PAYOUTS.md](PAYOUTS.md).
+
+Cash deposits by UPI go through Cashfree Payment Gateway on the server (`payments` Edge Function);
+the app only opens the checkout URL it gets back. See [PAYMENTS.md](PAYMENTS.md).
