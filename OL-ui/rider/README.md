@@ -112,7 +112,16 @@ Cross-cutting: `src/state-machine/deliveryStateMachine.ts` (12-state engine, ver
 Android foreground service, demo route simulator, track batching), `src/notifications`, `src/navigation/resume.ts`
 (resume after app kill — server state wins), `src/theme` (Figma tokens), `src/components/ui` + `src/components/app`.
 
-See `docs/ARCHITECTURE.md`, `docs/API_MAP.md`, `docs/DECISIONS.md`, `docs/QA.md`.
+See `docs/ARCHITECTURE.md`, `docs/API_MAP.md`, `docs/DATABASE.md`, `docs/DECISIONS.md`, `docs/QA.md`.
+
+## Database
+
+The server's Supabase Postgres schema (PostGIS) — geography, riders, onboarding, dispatch, the delivery
+engine, proofs, exceptions, earnings, the cash ledger, alerts — is in
+[`supabase/migrations`](../../supabase/migrations), with an ER diagram, the rules the database enforces
+and the spec mapping in [docs/DATABASE.md](docs/DATABASE.md). Apply it with
+`bash supabase/setup-database.sh`. The app never writes to it directly: everything goes through the
+server, and RLS lets a signed-in rider read only their own rows of four Realtime tables.
 
 ## Splash (OneLocal brand film)
 

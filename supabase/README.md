@@ -1,4 +1,24 @@
-# Supabase — OneLocal messaging, payouts, payments and KYC
+# Supabase — OneLocal rider database, messaging, payouts, payments and KYC
+
+## Database schema
+
+`migrations/20261002000000_rider_core.sql` is the rider schema (spec §6) on Postgres + PostGIS:
+geography, riders and onboarding, delivery jobs / offers / events / proofs / exceptions, earnings, the
+insert-only cash ledger, alerts and idempotency keys — RLS on every table, server-only writes, the
+delivery state machine enforced by a trigger. `seed.sql` is the Latur development world (no people).
+Tables, ER diagram and rules: [`OL-ui/rider/docs/DATABASE.md`](../OL-ui/rider/docs/DATABASE.md).
+
+Apply: `export SUPABASE_ACCESS_TOKEN=…`, then `bash supabase/setup-database.sh` (`seed` adds the
+development seed; dev / staging only).
+
+```
+setup-database.sh              link + db push (+ seed, status)
+migrations/*_rider_core.sql    rider schema, guards, helpers, RLS, Realtime, storage bucket, retention cron
+seed.sql                       Latur: state, city, 4 zones, Store A hub, earnings rule v3
+tests/schema.test.ts           every migration + seed on PGlite (Postgres 18 + PostGIS)
+```
+
+## Messaging
 
 `functions/notify` sends WhatsApp, SMS and email for the OneLocal platform: WhatsApp first, SMS when
 the number is not on WhatsApp, fails, times out, or the code is requested again. Setup, secrets,
@@ -13,7 +33,7 @@ setup-messaging.sh             one-command setup/deploy/test
 functions/_shared/messaging/   orchestrator, templates, providers (Meta, Twilio, MSG91, Resend, mock), stores, webhooks
 functions/notify/index.ts      Edge Function entry (Deno.serve)
 migrations/                    message_log + whatsapp_capability (RLS-locked)
-tests/                         node:test suite — cd tests && npm install && npm test
+tests/                         node:test suite (incl. the SQL schema) — cd tests && npm install && npm test
 ```
 
 ## Payouts (Cashfree)

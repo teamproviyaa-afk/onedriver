@@ -117,6 +117,24 @@ match verified" → licence `MH14 20110010000` (no date of birth asked) → "No 
 RE-UPLOAD `MH14 20110012345` → "Licence verified" → Proceed → vehicle `MH 24 AB 0000` + RC photo →
 "No vehicle was found" → `MH 24 AB 1234` → categories.
 
+## Database schema
+
+Automated: `supabase/tests/schema.test.ts` (24 node:test tests on PGlite — a real Postgres 18 with
+PostGIS 3.6, in-process). All six migrations and the seed are applied on a Supabase stand-in (auth,
+roles with Supabase's default grants, Realtime publication, Storage, pg_cron / pg_net / Vault stubs),
+then: RLS on every table; the app roles hold only SELECT on the four Realtime tables; helper functions
+are not executable by `anon` / `authenticated`; a rider reads only their own rider row, offers, signals
+and alerts, and gets *permission denied* on jobs, the cash balance, KYC and payouts; anonymous callers
+get nothing; no customer columns in rider-readable tables; the SQL transition table equals the app's
+`TRANSITIONS` for all 225 state pairs; jobs start as created / offered, version bumped by the database
+only, stale versions update nothing, skipped / backward / post-final steps refused, timestamps stamped;
+reassignment releases the rider and leaves them a `reassigned` signal; one accepted offer per job;
+event idempotency keys; ledger insert-only, balance, unique ref, positive amounts, limit override;
+zone lookup (Store A → latur-central, Pune → none); nearest online, approved, free riders; seed contents
+and re-run; track-point summary (1.86 km) and purge; idempotency-key and signal retention; existing
+Master tables untouched (RLS, grants, comments, columns). `setup-database.sh` checked with a stubbed
+`supabase` CLI.
+
 ## Splash (brand film)
 
 Automated: `src/__tests__/splash.test.ts` (mode per launch; the short clip ends when the logo is assembled).
